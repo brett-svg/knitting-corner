@@ -85,7 +85,7 @@ export async function getYarns(): Promise<Yarn[]> {
     console.error("[data] getYarns:", error.message);
     return [];
   }
-  return (data ?? []).map(rowToYarn);
+  return ((data ?? []) as unknown as YarnRow[]).map(rowToYarn);
 }
 
 export async function getProjects(): Promise<Project[]> {
@@ -101,7 +101,7 @@ export async function getProjects(): Promise<Project[]> {
     console.error("[data] getProjects:", error.message);
     return [];
   }
-  return ((data ?? []) as ProjectRow[]).map((p) => ({
+  return ((data ?? []) as unknown as ProjectRow[]).map((p) => ({
     id: p.id,
     name: p.name,
     pattern: p.patterns?.designer ?? p.patterns?.name ?? "—",
@@ -170,7 +170,7 @@ export async function getPatterns(): Promise<Pattern[]> {
     console.error("[data] getPatterns:", error.message);
     return [];
   }
-  return (data ?? []).map(rowToPattern);
+  return ((data ?? []) as unknown as PatternRow[]).map(rowToPattern);
 }
 
 export async function getPattern(id: string): Promise<Pattern | null> {
@@ -189,7 +189,7 @@ export async function getPattern(id: string): Promise<Pattern | null> {
     console.error("[data] getPattern:", error.message);
     return null;
   }
-  return data ? rowToPattern(data) : null;
+  return data ? rowToPattern(data as PatternRow) : null;
 }
 
 export async function getYarn(id: string): Promise<Yarn | null> {
@@ -208,7 +208,7 @@ export async function getYarn(id: string): Promise<Yarn | null> {
     if (error) console.error("[data] getYarn:", error.message);
     return null;
   }
-  return rowToYarn(data as YarnRow);
+  return rowToYarn(data as unknown as YarnRow);
 }
 
 export async function getProjectsUsingYarn(yarnId: string): Promise<Project[]> {
@@ -221,11 +221,11 @@ export async function getProjectsUsingYarn(yarnId: string): Promise<Project[]> {
     .select("project_id, projects(id,name,status,progress,hero,image_url,updated_at,patterns(name,designer))")
     .eq("yarn_id", yarnId);
   if (error || !data) return [];
-  return data
-    .map((r) => {
-      const p = (r as { projects: ProjectRow | null }).projects;
-      if (!p) return null;
-      return {
+  return data.flatMap<Project>((r) => {
+    const p = (r as unknown as { projects: ProjectRow | null }).projects;
+    if (!p) return [];
+    return [
+      {
         id: p.id,
         name: p.name,
         pattern: p.patterns?.designer ?? p.patterns?.name ?? "—",
@@ -234,9 +234,9 @@ export async function getProjectsUsingYarn(yarnId: string): Promise<Project[]> {
         yarnIds: [],
         hero: p.hero ?? p.image_url ?? "linear-gradient(135deg,#C084FC,#60A5FA)",
         updatedAt: p.updated_at.slice(0, 10),
-      } satisfies Project;
-    })
-    .filter((p): p is Project => Boolean(p));
+      },
+    ];
+  });
 }
 
 export async function getProject(id: string): Promise<Project | null> {
@@ -255,7 +255,7 @@ export async function getProject(id: string): Promise<Project | null> {
     if (error) console.error("[data] getProject:", error.message);
     return null;
   }
-  const p = data as ProjectRow;
+  const p = data as unknown as ProjectRow;
   return {
     id: p.id,
     name: p.name,
