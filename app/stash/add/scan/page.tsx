@@ -30,10 +30,16 @@ export default function ScanPage() {
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
-    const dataUrls = await Promise.all(
-      files.slice(0, 2).map((f) => compressToDataUrl(f, 1280, 0.82))
-    );
-    setImages(dataUrls);
+    setError(null);
+    try {
+      const dataUrls = await Promise.all(
+        files.slice(0, 2).map((f) => compressToDataUrl(f, 1280, 0.82))
+      );
+      setImages(dataUrls);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not read image");
+      if (fileRef.current) fileRef.current.value = "";
+    }
   }
 
   async function process() {
@@ -324,30 +330,55 @@ async function compressToDataUrl(
   maxEdge = 1280,
   quality = 0.82
 ): Promise<string> {
-  // Decode the bitmap (handles HEIC/JPEG/PNG via the browser)
-  const bitmap = await createImageBitmap(file).catch(() => null);
-  if (!bitmap) {
-    // Fall back to raw data URL if the browser can't decode
-    return new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(String(r.result));
-      r.onerror = () => reject(r.error);
-      r.readAsDataURL(file);
-    });
+  // Try createImageBitmap first (fast path, no DOM thrash)
+  let source: ImageBitmap | HTMLImageElement | null = await createImageBitmap(
+    file
+  ).catch(() => null);
+
+  // Fall back to <img> + objectURL — works for some formats createImageBitmap
+  // chokes on, including HEIC on Safari.
+  if (!source) {
+    source = await loadViaImage(file).catch(() => null);
   }
 
-  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
-  const w = Math.round(bitmap.width * scale);
-  const h = Math.round(bitmap.height * scale);
+  if (!source) {
+    throw new Error(
+      `Couldn't read this image (${file.type || "unknown type"}). ` +
+        "Try a JPEG or PNG — iPhones may need 'Camera → Formats → Most Compatible'."
+    );
+  }
+
+  const srcW = "naturalWidth" in source ? source.naturalWidth : source.width;
+  const srcH = "naturalHeight" in source ? source.naturalHeight : source.height;
+  const scale = Math.min(1, maxEdge / Math.max(srcW, srcH));
+  const w = Math.round(srcW * scale);
+  const h = Math.round(srcH * scale);
 
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas unavailable");
-  ctx.drawImage(bitmap, 0, 0, w, h);
+  ctx.drawImage(source as CanvasImageSource, 0, 0, w, h);
 
+  // Always re-encode to JPEG so we never ship HEIC/etc. to the API.
   return canvas.toDataURL("image/jpeg", quality);
+}
+
+function loadViaImage(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("image decode failed"));
+    };
+    img.src = url;
+  });
 }
 
 function CameraIcon() {
