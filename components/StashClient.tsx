@@ -17,6 +17,17 @@ const weights: WeightCategory[] = [
 ];
 
 type View = "cards" | "palette";
+type SortKey = "recent" | "weight" | "brand" | "colorway" | "yardage";
+
+const WEIGHT_ORDER: Record<WeightCategory, number> = {
+  Lace: 0,
+  Fingering: 1,
+  Sport: 2,
+  DK: 3,
+  Worsted: 4,
+  Aran: 5,
+  Bulky: 6,
+};
 
 export function StashClient({ yarns }: { yarns: Yarn[] }) {
   const [query, setQuery] = useState("");
@@ -25,9 +36,10 @@ export function StashClient({ yarns }: { yarns: Yarn[] }) {
     "all" | "available" | "reserved"
   >("all");
   const [view, setView] = useState<View>("cards");
+  const [sort, setSort] = useState<SortKey>("recent");
 
   const filtered = useMemo(() => {
-    return yarns.filter((y) => {
+    const list = yarns.filter((y) => {
       if (weight !== "All" && y.weight !== weight) return false;
       if (availability === "available" && y.reserved) return false;
       if (availability === "reserved" && !y.reserved) return false;
@@ -39,7 +51,36 @@ export function StashClient({ yarns }: { yarns: Yarn[] }) {
       }
       return true;
     });
-  }, [yarns, query, weight, availability]);
+
+    const sorted = [...list];
+    switch (sort) {
+      case "weight":
+        sorted.sort(
+          (a, b) =>
+            (WEIGHT_ORDER[a.weight] ?? 99) - (WEIGHT_ORDER[b.weight] ?? 99) ||
+            a.brand.localeCompare(b.brand)
+        );
+        break;
+      case "brand":
+        sorted.sort(
+          (a, b) =>
+            a.brand.localeCompare(b.brand) ||
+            a.colorway.localeCompare(b.colorway)
+        );
+        break;
+      case "colorway":
+        sorted.sort((a, b) => a.colorway.localeCompare(b.colorway));
+        break;
+      case "yardage":
+        sorted.sort(
+          (a, b) => b.yardage * b.skeins - a.yardage * a.skeins
+        );
+        break;
+      default:
+        sorted.sort((a, b) => (a.addedAt < b.addedAt ? 1 : -1));
+    }
+    return sorted;
+  }, [yarns, query, weight, availability, sort]);
 
   return (
     <div className="space-y-8">
