@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
 type ScanRequest = {
-  // data URLs (data:image/jpeg;base64,...) or remote URLs
+  // data URLs (data:image/jpeg;base64,...)
   images: string[];
 };
 
@@ -22,22 +22,35 @@ type YarnLabel = {
   needle_size: string | null;
 };
 
-const SCHEMA = {
-  name: "yarn_label",
-  schema: {
-    type: "object",
-    additionalProperties: false,
+const TOOL = {
+  name: "save_yarn_label",
+  description:
+    "Saves the structured yarn-label data extracted from the photos.",
+  input_schema: {
+    type: "object" as const,
     properties: {
-      brand: { type: ["string", "null"] },
-      product_line: { type: ["string", "null"] },
-      fiber: { type: ["string", "null"] },
-      weight_category: { type: ["string", "null"] },
-      yardage: { type: ["number", "null"] },
-      meters: { type: ["number", "null"] },
-      skein_weight_grams: { type: ["number", "null"] },
-      colorway: { type: ["string", "null"] },
-      dye_lot: { type: ["string", "null"] },
-      needle_size: { type: ["string", "null"] },
+      brand: { type: ["string", "null"] as const, description: "e.g. Malabrigo" },
+      product_line: { type: ["string", "null"] as const, description: "e.g. Rios" },
+      fiber: { type: ["string", "null"] as const, description: "Fiber composition string" },
+      weight_category: {
+        type: ["string", "null"] as const,
+        enum: [
+          "Lace",
+          "Fingering",
+          "Sport",
+          "DK",
+          "Worsted",
+          "Aran",
+          "Bulky",
+          null,
+        ],
+      },
+      yardage: { type: ["number", "null"] as const, description: "Yards per skein" },
+      meters: { type: ["number", "null"] as const, description: "Meters per skein" },
+      skein_weight_grams: { type: ["number", "null"] as const },
+      colorway: { type: ["string", "null"] as const, description: "Color name" },
+      dye_lot: { type: ["string", "null"] as const, description: "Dye lot code" },
+      needle_size: { type: ["string", "null"] as const },
     },
     required: [
       "brand",
@@ -52,15 +65,21 @@ const SCHEMA = {
       "needle_size",
     ],
   },
-  strict: true,
-} as const;
+};
 
 const SYSTEM = `You extract structured yarn-label data from photos of a yarn ball band.
-- Always return all fields; use null when not visible.
-- weight_category MUST be one of: Lace, Fingering, Sport, DK, Worsted, Aran, Bulky.
+- Always call the save_yarn_label tool with all fields. Use null when not visible.
+- weight_category MUST be one of: Lace, Fingering, Sport, DK, Worsted, Aran, Bulky (or null).
 - yardage in yards, meters in meters, skein_weight_grams in grams.
-- colorway is the human name (e.g. "Aniversario"). dye_lot is the alphanumeric lot code.
-- Infer reasonable values when packaging makes them obvious (e.g. metric → imperial).`;
+- colorway is the human-readable name (e.g. "Aniversario").
+- dye_lot is the alphanumeric lot code.
+- Infer reasonable values when packaging makes them obvious (metric ↔ imperial conversions).`;
+
+function decodeDataUrl(dataUrl: string) {
+  const m = /^data:(image\/[a-zA-Z+.-]+);base64,(.+)$/.exec(dataUrl);
+  if (!m) return null;
+  return { mediaType: m[1], data: m[2] };
+}
 
 export async function POST(req: Request) {
   let body: ScanRequest;
@@ -74,7 +93,7 @@ export async function POST(req: Request) {
   }
 
   // Dev fallback: no key wired → return a plausible mock so the UI flow works.
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY) {
     const mock: YarnLabel = {
       brand: "Malabrigo",
       product_line: "Rios",
@@ -90,31 +109,60 @@ export async function POST(req: Request) {
     return NextResponse.json({ label: mock, mocked: true });
   }
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const decoded = body.images.map(decodeDataUrl).filter(Boolean) as Array<{
+    mediaType: string;
+    data: string;
+  }>;
+  if (decoded.length === 0) {
+    return NextResponse.json(
+      { error: "Images must be base64 data URLs" },
+      { status: 400 }
+    );
+  }
+
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const model = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5";
 
   try {
-    const completion = await openai.chat.completions.create({
+    const content: Anthropic.ContentBlockParam[] = [
+      ...decoded.map(
+        (img) =>
+          ({
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: img.mediaType as
+                | "image/jpeg"
+                | "image/png"
+                | "image/gif"
+                | "image/webp",
+              data: img.data,
+            },
+          }) satisfies Anthropic.ImageBlockParam
+      ),
+      {
+        type: "text",
+        text: "Extract the yarn label data and call save_yarn_label.",
+      },
+    ];
+
+    const message = await anthropic.messages.create({
       model,
-      messages: [
-        { role: "system", content: SYSTEM },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: "Extract yarn label data from these photos." },
-            ...body.images.map((url) => ({
-              type: "image_url" as const,
-              image_url: { url },
-            })),
-          ],
-        },
-      ],
-      response_format: { type: "json_schema", json_schema: SCHEMA },
+      max_tokens: 1024,
+      system: SYSTEM,
+      tools: [TOOL],
+      tool_choice: { type: "tool", name: TOOL.name },
+      messages: [{ role: "user", content }],
     });
 
-    const raw = completion.choices[0]?.message?.content ?? "{}";
-    const label = JSON.parse(raw) as YarnLabel;
-    return NextResponse.json({ label, mocked: false });
+    const block = message.content.find((b) => b.type === "tool_use");
+    if (!block || block.type !== "tool_use") {
+      return NextResponse.json(
+        { error: "Model did not return structured output" },
+        { status: 502 }
+      );
+    }
+    return NextResponse.json({ label: block.input as YarnLabel, mocked: false });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "scan failed";
     return NextResponse.json({ error: msg }, { status: 500 });

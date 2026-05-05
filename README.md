@@ -7,7 +7,7 @@ A private craft command center — yarn stash, patterns, projects, and AI label 
 - Next.js 16 (App Router) + React 19 + TypeScript
 - Tailwind CSS v3 · Fraunces (display) + Manrope (body)
 - Supabase (Postgres + Auth + Storage) via `@supabase/ssr`
-- OpenAI (`gpt-4o-mini` by default) for yarn-label extraction
+- Anthropic Claude (`claude-haiku-4-5` by default) for yarn-label extraction
 
 ## Setup
 
@@ -25,8 +25,8 @@ Open http://localhost:3000.
 | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
-| `OPENAI_API_KEY` | enables real label scanning (mocked if absent) |
-| `OPENAI_MODEL` | optional override (default `gpt-4o-mini`) |
+| `ANTHROPIC_API_KEY` | enables real label scanning (mocked if absent) |
+| `ANTHROPIC_MODEL` | optional override (default `claude-haiku-4-5`) |
 
 If both Supabase keys are missing, the app runs in demo mode with mock data and the auth gate is disabled — useful for kicking the tires.
 
