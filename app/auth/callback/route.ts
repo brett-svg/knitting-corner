@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
@@ -10,10 +10,16 @@ export async function GET(request: NextRequest) {
     const supabase = await supabaseServer();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
-      return NextResponse.redirect(
-        new URL(`/login?error=${encodeURIComponent(error.message)}`, url)
-      );
+      return new Response(null, {
+        status: 303,
+        headers: {
+          Location: `/login?error=${encodeURIComponent(error.message)}`,
+        },
+      });
     }
   }
-  return NextResponse.redirect(new URL(next, url));
+  return new Response(null, {
+    status: 303,
+    headers: { Location: next.startsWith("/") ? next : "/" },
+  });
 }
