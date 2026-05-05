@@ -148,6 +148,23 @@ export function StashClient({ yarns }: { yarns: Yarn[] }) {
             label="Reserved"
           />
         </div>
+
+        <label className="flex items-center gap-2 md:ml-auto">
+          <span className="text-[11px] uppercase tracking-wider text-muted">
+            Sort
+          </span>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortKey)}
+            className="appearance-none rounded-full border border-border bg-white/80 px-3 py-1.5 text-xs font-medium text-ink outline-none transition focus:border-accent-lavender"
+          >
+            <option value="recent">Recently added</option>
+            <option value="weight">Weight (Lace → Bulky)</option>
+            <option value="brand">Brand</option>
+            <option value="colorway">Colorway</option>
+            <option value="yardage">Total yardage</option>
+          </select>
+        </label>
       </div>
 
       {filtered.length === 0 ? (
