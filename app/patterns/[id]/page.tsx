@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPattern, getYarns } from "@/lib/data";
 import { YarnCard } from "@/components/YarnCard";
+import { ColorPreview } from "@/components/ColorPreview";
 
 export const dynamic = "force-dynamic";
 
@@ -173,6 +174,22 @@ export default async function PatternDetailPage({
           </div>
         )}
       </section>
+
+      <ColorPreview
+        allocated={[]}
+        stash={matches.length > 0 ? matches : yarns}
+        title="Plan colors"
+        subtitle={
+          <>
+            Try it in your <span className="italic text-grad">stash</span>
+          </>
+        }
+        emptyHint={
+          matches.length > 0
+            ? "Add yarns from your matching stash to mock up how this pattern would look."
+            : "Add yarns from your stash to mock up how this pattern would look."
+        }
+      />
     </div>
   );
 }

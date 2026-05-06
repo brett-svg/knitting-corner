@@ -9,9 +9,15 @@ type Template = "stripes" | "yoke" | "fairisle";
 export function ColorPreview({
   allocated,
   stash,
+  title,
+  subtitle,
+  emptyHint,
 }: {
   allocated: Yarn[];
   stash: Yarn[];
+  title?: string;
+  subtitle?: React.ReactNode;
+  emptyHint?: string;
 }) {
   // Each "slot" starts as the allocated yarn but can be swapped to any other.
   const [slots, setSlots] = useState<Yarn[]>(() => allocated);
@@ -39,30 +45,53 @@ export function ColorPreview({
     setSlots((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  if (allocated.length === 0) {
+  // Available pool for swapping = stash minus what's already in slots
+  const slotIds = new Set(slots.map((y) => y.id));
+
+  if (slots.length === 0) {
     return (
-      <section className="card flex flex-col items-center gap-2 py-10 text-center">
-        <div className="h-10 w-10 rounded-full bg-grad-cool opacity-70" />
-        <p className="font-display text-xl">Nothing to preview yet</p>
-        <p className="max-w-sm text-sm text-muted">
-          Allocate at least one yarn above and we'll mock up how it'll look.
-        </p>
+      <section className="space-y-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-muted">
+            {title ?? "Color preview"}
+          </p>
+          <h2 className="mt-1 font-display text-3xl tracking-tight">
+            {subtitle ?? (
+              <>
+                How it'll <span className="italic text-grad">look together</span>
+              </>
+            )}
+          </h2>
+        </div>
+        <div className="card grad-border space-y-3 p-5">
+          <p className="text-sm text-muted">
+            {emptyHint ??
+              "Pick a yarn from your stash to start mocking it up."}
+          </p>
+          <AddSlotPicker
+            stash={stash}
+            onAdd={addSlot}
+            label="+ Pick a yarn from stash"
+            startOpen
+          />
+        </div>
       </section>
     );
   }
-
-  // Available pool for swapping = stash minus what's already in slots
-  const slotIds = new Set(slots.map((y) => y.id));
 
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-muted">
-            Color preview
+            {title ?? "Color preview"}
           </p>
           <h2 className="mt-1 font-display text-3xl tracking-tight">
-            How it'll <span className="italic text-grad">look together</span>
+            {subtitle ?? (
+              <>
+                How it'll <span className="italic text-grad">look together</span>
+              </>
+            )}
           </h2>
         </div>
         <TemplateTabs template={template} setTemplate={setTemplate} />
@@ -162,7 +191,7 @@ export function ColorPreview({
         />
       </div>
 
-      {dirty && (
+      {dirty && allocated.length > 0 && (
         <p className="rounded-xl border border-accent-violet/40 bg-accent-violet/10 px-3 py-2 text-xs text-ink">
           This is a what-if preview only — your actual project allocation
           hasn't changed. Swap yarns above the preview to commit them.
@@ -377,11 +406,15 @@ function FairIsle({ yarns }: { yarns: Yarn[] }) {
 function AddSlotPicker({
   stash,
   onAdd,
+  label,
+  startOpen,
 }: {
   stash: Yarn[];
   onAdd: (y: Yarn) => void;
+  label?: string;
+  startOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(Boolean(startOpen));
   if (stash.length === 0) return null;
   return (
     <div className="space-y-2">
@@ -389,7 +422,7 @@ function AddSlotPicker({
         onClick={() => setOpen((v) => !v)}
         className="btn-ghost w-full md:w-auto"
       >
-        {open ? "Close" : "+ Try another color in the mix"}
+        {open ? "Close" : label ?? "+ Try another color in the mix"}
       </button>
       {open && (
         <div className="card max-h-72 overflow-y-auto p-2">
