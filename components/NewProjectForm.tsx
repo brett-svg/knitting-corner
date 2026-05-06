@@ -20,6 +20,8 @@ export function NewProjectForm({
   const [yarnIds, setYarnIds] = useState<string[]>([]);
   const [status, setStatus] = useState<(typeof STATUSES)[number]>("Active");
   const [notes, setNotes] = useState("");
+  const [recipient, setRecipient] = useState("");
+  const [giftDate, setGiftDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,6 +54,8 @@ export function NewProjectForm({
           yarnIds,
           status,
           notes: notes || null,
+          recipient: recipient || null,
+          giftDate: giftDate || null,
         }),
       });
       const json = await res.json();
@@ -128,6 +132,31 @@ export function NewProjectForm({
                   <option key={s}>{s}</option>
                 ))}
               </select>
+            </label>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="block text-sm">
+              <span className="text-xs font-medium uppercase tracking-wider text-muted">
+                For (optional)
+              </span>
+              <input
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+                placeholder="e.g. Mom, baby Charlie, myself"
+                className="mt-1.5 w-full rounded-xl border border-border bg-white px-3.5 py-2.5 text-ink outline-none transition placeholder:text-muted/70 focus:border-accent-lavender focus:shadow-[0_0_0_4px_rgba(192,132,252,0.15)]"
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="text-xs font-medium uppercase tracking-wider text-muted">
+                Needed by (optional)
+              </span>
+              <input
+                type="date"
+                value={giftDate}
+                onChange={(e) => setGiftDate(e.target.value)}
+                className="mt-1.5 w-full rounded-xl border border-border bg-white px-3.5 py-2.5 text-ink outline-none transition placeholder:text-muted/70 focus:border-accent-lavender focus:shadow-[0_0_0_4px_rgba(192,132,252,0.15)]"
+              />
             </label>
           </div>
 

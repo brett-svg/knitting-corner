@@ -82,6 +82,11 @@ create table if not exists patterns (
 -- For projects added before cover_url existed
 alter table patterns add column if not exists cover_url text;
 
+-- Gift tracking on projects
+alter table projects add column if not exists recipient text;
+alter table projects add column if not exists gift_date date;
+alter table projects add column if not exists finished_at date;
+
 create table if not exists projects (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,

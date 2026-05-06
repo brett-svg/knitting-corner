@@ -24,9 +24,18 @@ export async function PATCH(
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (typeof body.name === "string") update.name = body.name;
   if (typeof body.notes === "string" || body.notes === null) update.notes = body.notes;
-  if (typeof body.status === "string") update.status = body.status;
+  if (typeof body.status === "string") {
+    update.status = body.status;
+    if (body.status === "Completed") {
+      update.finished_at = new Date().toISOString().slice(0, 10);
+    }
+  }
   if (typeof body.progress === "number")
     update.progress = Math.max(0, Math.min(1, body.progress));
+  if (typeof body.recipient === "string" || body.recipient === null)
+    update.recipient = body.recipient;
+  if (typeof body.giftDate === "string" || body.giftDate === null)
+    update.gift_date = body.giftDate;
 
   const { error } = await supabase
     .from("projects")

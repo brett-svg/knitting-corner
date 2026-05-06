@@ -32,6 +32,8 @@ export async function POST(req: Request) {
   const yarnIds: string[] = Array.isArray(body.yarnIds) ? body.yarnIds : [];
   const status: string = body.status ?? "Planned";
   const notes: string | null = body.notes || null;
+  const recipient: string | null = body.recipient?.trim() || null;
+  const giftDate: string | null = body.giftDate || null;
 
   const hero = HEROES[Math.floor(Math.random() * HEROES.length)];
 
@@ -45,6 +47,8 @@ export async function POST(req: Request) {
       progress: 0,
       notes,
       hero,
+      recipient,
+      gift_date: giftDate,
     })
     .select("id")
     .single();

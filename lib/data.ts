@@ -45,6 +45,9 @@ type ProjectRow = {
   hero: string | null;
   image_url: string | null;
   updated_at: string;
+  recipient: string | null;
+  gift_date: string | null;
+  finished_at: string | null;
   patterns: { name: string; designer: string | null } | null;
   project_yarns: { yarn_id: string }[] | null;
 };
@@ -94,14 +97,18 @@ export async function getProjects(): Promise<Project[]> {
   const { data, error } = await supabase
     .from("projects")
     .select(
-      "id,name,status,progress,hero,image_url,updated_at,patterns(name,designer),project_yarns(yarn_id)"
+      "id,name,status,progress,hero,image_url,updated_at,recipient,gift_date,finished_at,patterns(name,designer),project_yarns(yarn_id)"
     )
     .order("updated_at", { ascending: false });
   if (error) {
     console.error("[data] getProjects:", error.message);
     return [];
   }
-  return ((data ?? []) as unknown as ProjectRow[]).map((p) => ({
+  return ((data ?? []) as unknown as ProjectRow[]).map(rowToProject);
+}
+
+function rowToProject(p: ProjectRow): Project {
+  return {
     id: p.id,
     name: p.name,
     pattern: p.patterns?.designer ?? p.patterns?.name ?? "—",
@@ -110,7 +117,10 @@ export async function getProjects(): Promise<Project[]> {
     yarnIds: (p.project_yarns ?? []).map((j) => j.yarn_id),
     hero: p.hero ?? p.image_url ?? "linear-gradient(135deg,#C084FC,#60A5FA)",
     updatedAt: p.updated_at.slice(0, 10),
-  }));
+    recipient: p.recipient,
+    giftDate: p.gift_date,
+    finishedAt: p.finished_at,
+  };
 }
 
 type PatternRow = {
@@ -218,24 +228,15 @@ export async function getProjectsUsingYarn(yarnId: string): Promise<Project[]> {
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("project_yarns")
-    .select("project_id, projects(id,name,status,progress,hero,image_url,updated_at,patterns(name,designer))")
+    .select(
+      "project_id, projects(id,name,status,progress,hero,image_url,updated_at,recipient,gift_date,finished_at,patterns(name,designer))"
+    )
     .eq("yarn_id", yarnId);
   if (error || !data) return [];
   return data.flatMap<Project>((r) => {
     const p = (r as unknown as { projects: ProjectRow | null }).projects;
     if (!p) return [];
-    return [
-      {
-        id: p.id,
-        name: p.name,
-        pattern: p.patterns?.designer ?? p.patterns?.name ?? "—",
-        status: p.status,
-        progress: Number(p.progress ?? 0),
-        yarnIds: [],
-        hero: p.hero ?? p.image_url ?? "linear-gradient(135deg,#C084FC,#60A5FA)",
-        updatedAt: p.updated_at.slice(0, 10),
-      },
-    ];
+    return [{ ...rowToProject(p), yarnIds: [] }];
   });
 }
 
@@ -247,7 +248,7 @@ export async function getProject(id: string): Promise<Project | null> {
   const { data, error } = await supabase
     .from("projects")
     .select(
-      "id,name,status,progress,hero,image_url,updated_at,patterns(name,designer),project_yarns(yarn_id)"
+      "id,name,status,progress,hero,image_url,updated_at,recipient,gift_date,finished_at,patterns(name,designer),project_yarns(yarn_id)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -255,17 +256,7 @@ export async function getProject(id: string): Promise<Project | null> {
     if (error) console.error("[data] getProject:", error.message);
     return null;
   }
-  const p = data as unknown as ProjectRow;
-  return {
-    id: p.id,
-    name: p.name,
-    pattern: p.patterns?.designer ?? p.patterns?.name ?? "—",
-    status: p.status,
-    progress: Number(p.progress ?? 0),
-    yarnIds: (p.project_yarns ?? []).map((j) => j.yarn_id),
-    hero: p.hero ?? p.image_url ?? "linear-gradient(135deg,#C084FC,#60A5FA)",
-    updatedAt: p.updated_at.slice(0, 10),
-  };
+  return rowToProject(data as unknown as ProjectRow);
 }
 
 export async function getNeedles(): Promise<Needle[]> {

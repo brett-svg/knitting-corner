@@ -206,6 +206,9 @@ export type Project = {
   yarnIds: string[];
   hero: string;
   updatedAt: string;
+  recipient?: string | null;
+  giftDate?: string | null;
+  finishedAt?: string | null;
 };
 
 export const projects: Project[] = [

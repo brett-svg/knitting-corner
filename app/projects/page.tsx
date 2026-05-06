@@ -57,7 +57,15 @@ export default async function ProjectsPage() {
                     </p>
                     <span className="chip">{p.status}</span>
                   </div>
-                  <p className="text-sm text-muted">Pattern by {p.pattern}</p>
+                  <p className="text-sm text-muted">
+                    Pattern by {p.pattern}
+                    {p.recipient && (
+                      <>
+                        {" · "}
+                        for <span className="text-ink">{p.recipient}</span>
+                      </>
+                    )}
+                  </p>
 
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-tint">
                     <div
