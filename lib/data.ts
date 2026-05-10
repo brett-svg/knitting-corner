@@ -33,10 +33,12 @@ type YarnRow = {
   swatch: string | null;
   image_url: string | null;
   storage_location_id: string | null;
-  storage_locations: { name: string } | null;
   notes: string | null;
   created_at: string;
 };
+
+const YARN_COLUMNS =
+  "id,brand,product_line,colorway,dye_lot,fiber,weight_category,yardage,meters,skein_weight_grams,skeins,reserved,swatch,image_url,storage_location_id,notes,created_at";
 
 type ProjectRow = {
   id: string;
@@ -53,7 +55,7 @@ type ProjectRow = {
   project_yarns: { yarn_id: string }[] | null;
 };
 
-function rowToYarn(r: YarnRow): Yarn {
+function rowToYarn(r: YarnRow, locationName: string | null = null): Yarn {
   return {
     id: r.id,
     brand: r.brand ?? "",
@@ -66,15 +68,36 @@ function rowToYarn(r: YarnRow): Yarn {
     meters: r.meters ?? 0,
     skeinGrams: r.skein_weight_grams ?? 0,
     skeins: r.skeins ?? 1,
-    storage: r.storage_locations?.name ?? "",
+    storage: locationName ?? "",
     swatch: r.swatch ?? "linear-gradient(135deg,#C084FC,#60A5FA)",
     imageUrl: r.image_url ?? null,
     locationId: r.storage_location_id,
-    locationName: r.storage_locations?.name ?? null,
+    locationName,
     reserved: r.reserved ?? false,
     notes: r.notes,
     addedAt: r.created_at.slice(0, 10),
   };
+}
+
+async function locationNameMap(
+  supabase: Awaited<ReturnType<typeof supabaseServer>>,
+  ids: Array<string | null>
+): Promise<Map<string, string>> {
+  const unique = Array.from(
+    new Set(ids.filter((id): id is string => Boolean(id)))
+  );
+  const map = new Map<string, string>();
+  if (unique.length === 0) return map;
+  const { data, error } = await supabase
+    .from("storage_locations")
+    .select("id,name")
+    .in("id", unique);
+  if (error) {
+    console.error("[data] locationNameMap:", error.message);
+    return map;
+  }
+  for (const r of data ?? []) map.set(r.id, r.name);
+  return map;
 }
 
 export async function getYarns(): Promise<Yarn[]> {
@@ -82,15 +105,20 @@ export async function getYarns(): Promise<Yarn[]> {
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("yarns")
-    .select(
-      "id,brand,product_line,colorway,dye_lot,fiber,weight_category,yardage,meters,skein_weight_grams,skeins,reserved,swatch,image_url,storage_location_id,storage_locations(name),notes,created_at"
-    )
+    .select(YARN_COLUMNS)
     .order("created_at", { ascending: false });
   if (error) {
     console.error("[data] getYarns:", error.message);
     return [];
   }
-  return ((data ?? []) as unknown as YarnRow[]).map(rowToYarn);
+  const rows = (data ?? []) as unknown as YarnRow[];
+  const locations = await locationNameMap(
+    supabase,
+    rows.map((r) => r.storage_location_id)
+  );
+  return rows.map((r) =>
+    rowToYarn(r, r.storage_location_id ? locations.get(r.storage_location_id) ?? null : null)
+  );
 }
 
 export async function getProjects(): Promise<Project[]> {
@@ -211,16 +239,20 @@ export async function getYarn(id: string): Promise<Yarn | null> {
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("yarns")
-    .select(
-      "id,brand,product_line,colorway,dye_lot,fiber,weight_category,yardage,meters,skein_weight_grams,skeins,reserved,swatch,image_url,storage_location_id,storage_locations(name),notes,created_at"
-    )
+    .select(YARN_COLUMNS)
     .eq("id", id)
     .maybeSingle();
   if (error || !data) {
     if (error) console.error("[data] getYarn:", error.message);
     return null;
   }
-  return rowToYarn(data as unknown as YarnRow);
+  const row = data as unknown as YarnRow;
+  let locName: string | null = null;
+  if (row.storage_location_id) {
+    const map = await locationNameMap(supabase, [row.storage_location_id]);
+    locName = map.get(row.storage_location_id) ?? null;
+  }
+  return rowToYarn(row, locName);
 }
 
 export async function getProjectsUsingYarn(yarnId: string): Promise<Project[]> {
