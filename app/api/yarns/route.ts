@@ -14,6 +14,46 @@ const SWATCHES = [
 
 const BUCKET = "yarn-photos";
 
+// Normalize a brand/colorway/dye-lot string for fuzzy comparison:
+// lowercase, strip punctuation, collapse whitespace, drop common
+// suffix noise like "yarns", "yarn co", "yarn company", "ltd".
+function normalize(s: string | null | undefined): string {
+  if (!s) return "";
+  return s
+    .toLowerCase()
+    .replace(/[®™©.,'"`!?]/g, "")
+    .replace(/\s+(yarn(s)?( co(mpany)?)?|ltd|inc)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sameYarn(
+  a: { brand: string | null; colorway: string | null; dye_lot: string | null },
+  b: { brand: string | null; colorway: string | null; dye_lot: string | null }
+): boolean {
+  const aBrand = normalize(a.brand);
+  const bBrand = normalize(b.brand);
+  // Brand: exact-after-normalization OR one is a substring of the other
+  // (handles "Lion Brand" vs "Lion Brand Yarn Company" extraction wobble).
+  const brandMatches =
+    !!aBrand &&
+    !!bBrand &&
+    (aBrand === bBrand || aBrand.includes(bBrand) || bBrand.includes(aBrand));
+  if (!brandMatches) return false;
+
+  const aColor = normalize(a.colorway);
+  const bColor = normalize(b.colorway);
+  if (!aColor || !bColor || aColor !== bColor) return false;
+
+  // Dye lot is the strongest tiebreaker. If both have lots, they must match.
+  // If neither has one, treat as match. If only one has one, treat as match
+  // too (the AI may have skipped it on one scan).
+  const aLot = normalize(a.dye_lot);
+  const bLot = normalize(b.dye_lot);
+  if (aLot && bLot && aLot !== bLot) return false;
+  return true;
+}
+
 function decodeDataUrl(dataUrl: string) {
   const m = /^data:(image\/[a-zA-Z+.-]+);base64,(.+)$/.exec(dataUrl);
   if (!m) return null;
@@ -46,17 +86,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  // Duplicate detection: same brand + colorway + dye_lot for this user.
+  // Duplicate detection: same yarn for this user, normalized comparison.
   const force = Boolean(body.force);
   if (!force && label.brand && label.colorway) {
     const { data: existing } = await supabase
       .from("yarns")
-      .select("id, brand, product_line, colorway, dye_lot, skeins, swatch, image_url")
-      .eq("user_id", user.id)
-      .ilike("brand", label.brand)
-      .ilike("colorway", label.colorway);
-    const dupe = (existing ?? []).find(
-      (e) => (e.dye_lot ?? "").trim() === (label.dye_lot ?? "").trim()
+      .select(
+        "id, brand, product_line, colorway, dye_lot, skeins, swatch, image_url"
+      )
+      .eq("user_id", user.id);
+    const dupe = (existing ?? []).find((e) =>
+      sameYarn(
+        { brand: e.brand, colorway: e.colorway, dye_lot: e.dye_lot },
+        {
+          brand: label.brand,
+          colorway: label.colorway,
+          dye_lot: label.dye_lot,
+        }
+      )
     );
     if (dupe) {
       return NextResponse.json(
