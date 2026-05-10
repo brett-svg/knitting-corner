@@ -98,7 +98,7 @@ export function StashClient({ yarns }: { yarns: Yarn[] }) {
         </div>
         <div className="flex items-center gap-2">
           <ViewToggle view={view} setView={setView} />
-          <Link href="/stash/add" className="btn-grad">
+          <Link href="/stash/add/scan" className="btn-grad">
             + Add yarn
           </Link>
         </div>

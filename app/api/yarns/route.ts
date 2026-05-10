@@ -46,6 +46,38 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
+  // Duplicate detection: same brand + colorway + dye_lot for this user.
+  const force = Boolean(body.force);
+  if (!force && label.brand && label.colorway) {
+    const { data: existing } = await supabase
+      .from("yarns")
+      .select("id, brand, product_line, colorway, dye_lot, skeins, swatch, image_url")
+      .eq("user_id", user.id)
+      .ilike("brand", label.brand)
+      .ilike("colorway", label.colorway);
+    const dupe = (existing ?? []).find(
+      (e) => (e.dye_lot ?? "").trim() === (label.dye_lot ?? "").trim()
+    );
+    if (dupe) {
+      return NextResponse.json(
+        {
+          duplicate: {
+            id: dupe.id,
+            brand: dupe.brand,
+            productLine: dupe.product_line,
+            colorway: dupe.colorway,
+            dyeLot: dupe.dye_lot,
+            skeins: dupe.skeins,
+            swatch: dupe.swatch,
+            imageUrl: dupe.image_url,
+          },
+          incomingSkeins: skeins,
+        },
+        { status: 409 }
+      );
+    }
+  }
+
   // Upload first image (if any) — others can be wired later for back/side shots.
   let imageUrl: string | null = null;
   const first = images[0];
