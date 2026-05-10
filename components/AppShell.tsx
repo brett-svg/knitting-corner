@@ -26,14 +26,20 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
               <CameraIcon /> Scan yarn
             </Link>
             {user ? (
-              <form action="/auth/signout" method="post">
-                <button
-                  className="rounded-full border border-border bg-white/70 px-3 py-1.5 text-xs text-muted backdrop-blur transition hover:text-ink"
-                  title={user.email ?? undefined}
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/whoami"
+                  className="hidden text-xs text-muted hover:text-ink lg:inline"
+                  title={user.id}
                 >
-                  Sign out
-                </button>
-              </form>
+                  {user.email}
+                </Link>
+                <form action="/auth/signout" method="post">
+                  <button className="rounded-full border border-border bg-white/70 px-3 py-1.5 text-xs text-muted backdrop-blur transition hover:text-ink">
+                    Sign out
+                  </button>
+                </form>
+              </div>
             ) : null}
           </div>
         </div>
