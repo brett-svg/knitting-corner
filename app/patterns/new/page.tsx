@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import clsx from "clsx";
+import { renderPdfPage1 } from "@/lib/pdf-cover";
 
 const WEIGHTS = [
   "Lace",
@@ -50,6 +51,8 @@ export default function NewPatternPage() {
   const router = useRouter();
   const [form, setForm] = useState<Form>(EMPTY);
   const [pdf, setPdf] = useState<File | null>(null);
+  const [coverBlob, setCoverBlob] = useState<Blob | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,9 +64,19 @@ export default function NewPatternPage() {
 
   async function onPdf(file: File | null) {
     setPdf(file);
+    setCoverBlob(null);
+    setCoverPreview(null);
     if (!file) return;
-    // Auto-extract immediately on upload — instant gratification
+    // Render cover and extract metadata in parallel
     void extractFrom(file);
+    void buildCover(file);
+  }
+
+  async function buildCover(file: File) {
+    const blob = await renderPdfPage1(file);
+    if (!blob) return;
+    setCoverBlob(blob);
+    setCoverPreview(URL.createObjectURL(blob));
   }
 
   async function extractFrom(file: File) {
@@ -116,6 +129,7 @@ export default function NewPatternPage() {
         if (v) fd.set(k, v);
       }
       if (pdf) fd.set("pdf", pdf);
+      if (coverBlob) fd.set("cover", coverBlob, "cover.jpg");
       const res = await fetch("/api/patterns", { method: "POST", body: fd });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Save failed");
@@ -174,6 +188,19 @@ export default function NewPatternPage() {
             <p className="mt-1 text-xs text-muted">
               Auto-filled at {extractedAt} — review below before saving.
             </p>
+          )}
+          {coverPreview && (
+            <div className="mt-3 flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={coverPreview}
+                alt="Cover preview"
+                className="h-20 w-16 rounded-lg border border-border object-cover"
+              />
+              <p className="text-xs text-muted">
+                Cover rendered from page 1 of the PDF.
+              </p>
+            </div>
           )}
         </label>
 

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Pattern } from "@/lib/mock";
+import { RegenerateCoverButton } from "@/components/RegenerateCoverButton";
 
 const WEIGHTS = [
   "Lace",
@@ -82,20 +83,27 @@ export function PatternEditor({ pattern }: { pattern: Pattern }) {
 
   if (!open) {
     return (
-      <section className="card flex flex-wrap items-center justify-between gap-3 p-5">
-        <p className="text-sm text-muted">Need to fix a typo or add notes?</p>
-        <div className="flex gap-2">
-          <button onClick={() => setOpen(true)} className="btn-ghost">
-            Edit pattern
-          </button>
-          <button
-            onClick={remove}
-            disabled={busy}
-            className="rounded-full border border-accent-rose/40 bg-white px-4 py-2 text-sm font-medium text-accent-rose transition hover:bg-accent-rose/10"
-          >
-            Delete
-          </button>
+      <section className="card space-y-3 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted">Need to fix a typo or add notes?</p>
+          <div className="flex gap-2">
+            <button onClick={() => setOpen(true)} className="btn-ghost">
+              Edit pattern
+            </button>
+            <button
+              onClick={remove}
+              disabled={busy}
+              className="rounded-full border border-accent-rose/40 bg-white px-4 py-2 text-sm font-medium text-accent-rose transition hover:bg-accent-rose/10"
+            >
+              Delete
+            </button>
+          </div>
         </div>
+        {pattern.pdfPath && (
+          <div className="border-t border-border pt-3">
+            <RegenerateCoverButton patternId={pattern.id} />
+          </div>
+        )}
       </section>
     );
   }

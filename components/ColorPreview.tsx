@@ -254,9 +254,7 @@ function Stripes({ yarns }: { yarns: Yarn[] }) {
           key={i}
           className="flex-1"
           style={{
-            background: y.imageUrl ? `url(${y.imageUrl})` : y.swatch,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
+            background: y.swatch,
           }}
         />
       ))}
@@ -271,41 +269,20 @@ function Yoke({ yarns }: { yarns: Yarn[] }) {
   return (
     <div className="relative aspect-[16/9] overflow-hidden">
       {/* Body */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background: body.imageUrl ? `url(${body.imageUrl})` : body.swatch,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      />
+      <div className="absolute inset-0" style={{ background: body.swatch }} />
       {/* Yoke */}
       <div
         className="absolute left-0 right-0 top-0 h-[34%]"
-        style={{
-          background: yoke.imageUrl ? `url(${yoke.imageUrl})` : yoke.swatch,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
+        style={{ background: yoke.swatch }}
       />
       {/* Accent ribs */}
       <div
         className="absolute left-0 right-0 top-[34%] h-[3%]"
-        style={{
-          background: accent.imageUrl
-            ? `url(${accent.imageUrl})`
-            : accent.swatch,
-          backgroundSize: "cover",
-        }}
+        style={{ background: accent.swatch }}
       />
       <div
         className="absolute left-0 right-0 bottom-0 h-[6%]"
-        style={{
-          background: accent.imageUrl
-            ? `url(${accent.imageUrl})`
-            : accent.swatch,
-          backgroundSize: "cover",
-        }}
+        style={{ background: accent.swatch }}
       />
     </div>
   );
@@ -330,8 +307,7 @@ function FairIsle({ yarns }: { yarns: Yarn[] }) {
           <div
             key={`r1-${i}`}
             style={{
-              background: y.imageUrl ? `url(${y.imageUrl})` : y.swatch,
-              backgroundSize: "cover",
+              background: y.swatch,
             }}
           />
         ))}
@@ -342,8 +318,7 @@ function FairIsle({ yarns }: { yarns: Yarn[] }) {
             <div
               key={`r2-${i}`}
               style={{
-                background: y.imageUrl ? `url(${y.imageUrl})` : y.swatch,
-                backgroundSize: "cover",
+                background: y.swatch,
               }}
             />
           );
@@ -355,8 +330,7 @@ function FairIsle({ yarns }: { yarns: Yarn[] }) {
             <div
               key={`r3-${i}`}
               style={{
-                background: y.imageUrl ? `url(${y.imageUrl})` : y.swatch,
-                backgroundSize: "cover",
+                background: y.swatch,
               }}
             />
           );
@@ -368,8 +342,7 @@ function FairIsle({ yarns }: { yarns: Yarn[] }) {
             <div
               key={`r4-${i}`}
               style={{
-                background: y.imageUrl ? `url(${y.imageUrl})` : y.swatch,
-                backgroundSize: "cover",
+                background: y.swatch,
               }}
             />
           );
@@ -381,8 +354,7 @@ function FairIsle({ yarns }: { yarns: Yarn[] }) {
             <div
               key={`r5-${i}`}
               style={{
-                background: y.imageUrl ? `url(${y.imageUrl})` : y.swatch,
-                backgroundSize: "cover",
+                background: y.swatch,
               }}
             />
           );

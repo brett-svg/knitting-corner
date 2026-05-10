@@ -16,14 +16,28 @@ export default async function PatternDetailPage({
   const [pattern, yarns] = await Promise.all([getPattern(id), getYarns()]);
   if (!pattern) notFound();
 
+  // Show every stash yarn matching the pattern's weight, sorted by total
+  // yards available (descending). Patterns often use multiple skeins or
+  // multiple colors, so requiring a single skein-line to meet the full
+  // yardage was overly strict.
   const matches = yarns
-    .filter((y) => {
-      if (pattern.yarnWeight && y.weight !== pattern.yarnWeight) return false;
-      const total = y.yardage * y.skeins;
-      if (pattern.requiredYardage && total < pattern.requiredYardage) return false;
-      return true;
-    })
+    .filter(
+      (y) => !pattern.yarnWeight || y.weight === pattern.yarnWeight
+    )
     .sort((a, b) => b.yardage * b.skeins - a.yardage * a.skeins);
+
+  const totalAvailable = matches.reduce(
+    (n, y) => n + y.yardage * y.skeins,
+    0
+  );
+  const required = pattern.requiredYardage ?? 0;
+  const enough = required > 0 && totalAvailable >= required * 1.1;
+  const tight =
+    required > 0 && totalAvailable >= required && !enough;
+  const short = required > 0 && totalAvailable < required;
+  const singleLineCovers = matches.filter(
+    (y) => required > 0 && y.yardage * y.skeins >= required
+  );
 
   return (
     <div className="space-y-10">
@@ -143,35 +157,48 @@ export default async function PatternDetailPage({
               Stash match
             </p>
             <h2 className="mt-1 font-display text-3xl tracking-tight">
-              {matches.length > 0 ? (
-                <>
-                  {matches.length} skein
-                  {matches.length === 1 ? "" : "s"} could{" "}
-                  <span className="italic text-grad">make this</span>
-                </>
-              ) : (
+              {matches.length === 0 ? (
                 <>
                   Nothing in your stash{" "}
                   <span className="italic text-grad">fits — yet</span>
                 </>
+              ) : required > 0 ? (
+                <>
+                  {totalAvailable.toLocaleString()} yds of{" "}
+                  <span className="italic text-grad">
+                    {pattern.yarnWeight ?? "matching"} yarn
+                  </span>{" "}
+                  available
+                </>
+              ) : (
+                <>
+                  {matches.length}{" "}
+                  {pattern.yarnWeight ?? "matching"} skein
+                  {matches.length === 1 ? "" : "s"} in your{" "}
+                  <span className="italic text-grad">stash</span>
+                </>
               )}
             </h2>
-            {(pattern.yarnWeight || pattern.requiredYardage) && (
-              <p className="mt-2 text-sm text-muted">
-                Filtered by{" "}
-                {pattern.yarnWeight && (
+            {required > 0 && matches.length > 0 && (
+              <p
+                className={
+                  enough
+                    ? "mt-2 text-sm text-accent-teal"
+                    : tight
+                      ? "mt-2 text-sm text-ink"
+                      : "mt-2 text-sm text-accent-rose"
+                }
+              >
+                {enough
+                  ? `Plenty — pattern needs ${required.toLocaleString()} yds.`
+                  : tight
+                    ? `Just enough — pattern needs ${required.toLocaleString()} yds, no safety buffer.`
+                    : `${(required - totalAvailable).toLocaleString()} yds short of the ${required.toLocaleString()} the pattern calls for.`}
+                {singleLineCovers.length > 0 && (
                   <>
-                    weight <span className="text-ink">{pattern.yarnWeight}</span>
-                  </>
-                )}
-                {pattern.yarnWeight && pattern.requiredYardage && " · "}
-                {pattern.requiredYardage && (
-                  <>
-                    ≥{" "}
-                    <span className="text-ink">
-                      {pattern.requiredYardage.toLocaleString()} yds
-                    </span>{" "}
-                    available
+                    {" · "}
+                    {singleLineCovers.length} single-color option
+                    {singleLineCovers.length === 1 ? "" : "s"} covers it alone
                   </>
                 )}
               </p>

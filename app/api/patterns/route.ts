@@ -75,12 +75,30 @@ export async function POST(req: Request) {
       );
     }
 
-    const png = await renderFirstPage(buf);
-    if (png) {
-      const coverPath = `${user.id}/${crypto.randomUUID()}.png`;
+    // Prefer a client-rendered cover (passed in formdata as "cover").
+    // Fall back to server-side render via pdf-to-img if not provided.
+    const incomingCover = fd.get("cover");
+    let coverBytes: Buffer | null = null;
+    let coverContentType = "image/jpeg";
+    if (incomingCover instanceof File && incomingCover.size > 0) {
+      coverBytes = Buffer.from(await incomingCover.arrayBuffer());
+      coverContentType = incomingCover.type || "image/jpeg";
+    } else {
+      const png = await renderFirstPage(buf);
+      if (png) {
+        coverBytes = png;
+        coverContentType = "image/png";
+      }
+    }
+    if (coverBytes) {
+      const ext = coverContentType.split("/")[1] || "jpg";
+      const coverPath = `${user.id}/${crypto.randomUUID()}.${ext}`;
       const upCover = await supabase.storage
         .from(COVER_BUCKET)
-        .upload(coverPath, png, { contentType: "image/png", upsert: false });
+        .upload(coverPath, coverBytes, {
+          contentType: coverContentType,
+          upsert: false,
+        });
       if (!upCover.error) {
         cover_url = supabase.storage
           .from(COVER_BUCKET)
