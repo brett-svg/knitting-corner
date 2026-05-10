@@ -98,6 +98,10 @@ alter table patterns add column if not exists techniques text;
 alter table patterns add column if not exists garment_type text;
 alter table patterns add column if not exists recommended_yarn text;
 
+-- Force PostgREST to refresh its schema cache so new columns are
+-- visible to the API immediately after running this file.
+notify pgrst, 'reload schema';
+
 create table if not exists projects (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
