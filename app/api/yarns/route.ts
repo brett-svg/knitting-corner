@@ -1,16 +1,9 @@
 import { NextResponse } from "next/server";
 import { hasSupabase, supabaseServer } from "@/lib/supabase/server";
+import { gradientFromHex, pickSwatch } from "@/lib/swatch";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
-
-const SWATCHES = [
-  "linear-gradient(135deg,#F472B6 0%,#C084FC 45%,#60A5FA 90%)",
-  "linear-gradient(135deg,#FDBA74 0%,#FB7185 60%,#9F1239 100%)",
-  "linear-gradient(135deg,#A7F3D0 0%,#5EEAD4 50%,#60A5FA 100%)",
-  "linear-gradient(135deg,#FFE4E6 0%,#FDBA74 55%,#FB7185 100%)",
-  "linear-gradient(135deg,#E9D5FF 0%,#A78BFA 55%,#6D28D9 100%)",
-];
 
 const BUCKET = "yarn-photos";
 
@@ -149,7 +142,8 @@ export async function POST(req: Request) {
     }
   }
 
-  const swatch = SWATCHES[Math.floor(Math.random() * SWATCHES.length)];
+  const swatch =
+    gradientFromHex(label.swatch_hex ?? "") || pickSwatch(label.colorway);
 
   const { data, error } = await supabase
     .from("yarns")

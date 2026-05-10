@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import clsx from "clsx";
 import type { Project, Yarn } from "@/lib/mock";
+import { YarnSwatch } from "@/components/YarnSwatch";
 
 export function ProjectAllocationEditor({
   project,
@@ -132,10 +133,7 @@ export function ProjectAllocationEditor({
         <ul className="grid gap-3 md:grid-cols-2">
           {linked.map((y) => (
             <li key={y.id} className="card flex items-center gap-3 p-3">
-              <span
-                className="h-12 w-12 shrink-0 rounded-full ring-2 ring-white"
-                style={{ background: y.swatch }}
-              />
+              <YarnSwatch yarn={y} size={48} />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-display text-base">{y.colorway}</p>
                 <p className="truncate text-xs text-muted">
@@ -181,10 +179,7 @@ export function ProjectAllocationEditor({
                     "flex items-center gap-3 rounded-xl border border-border bg-white p-3 text-left transition hover:border-accent-lavender hover:bg-tint/40"
                   )}
                 >
-                  <span
-                    className="h-10 w-10 shrink-0 rounded-full ring-2 ring-white/70"
-                    style={{ background: y.swatch }}
-                  />
+                  <YarnSwatch yarn={y} size={40} className="ring-white/70" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-display text-base">
                       {y.colorway}

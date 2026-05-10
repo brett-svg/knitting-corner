@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import clsx from "clsx";
 import type { Yarn } from "@/lib/mock";
+import { YarnSwatch } from "@/components/YarnSwatch";
 
 type Template = "stripes" | "yoke" | "fairisle";
 
@@ -234,19 +235,7 @@ function TemplateTabs({
 }
 
 function Swatch({ yarn, size }: { yarn: Yarn; size: number }) {
-  return (
-    <span
-      className="block shrink-0 rounded-full ring-2 ring-white shadow-soft"
-      style={{
-        width: size,
-        height: size,
-        background: yarn.imageUrl ? undefined : yarn.swatch,
-        backgroundImage: yarn.imageUrl ? `url(${yarn.imageUrl})` : undefined,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }}
-    />
-  );
+  return <YarnSwatch yarn={yarn} size={size} />;
 }
 
 /* ─── Pattern templates ───────────────────────────────────────────── */

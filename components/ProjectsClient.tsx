@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import clsx from "clsx";
 import type { Project, Yarn } from "@/lib/mock";
+import { YarnSwatch } from "@/components/YarnSwatch";
 
 type StatusFilter = "All" | Project["status"];
 
@@ -142,12 +143,7 @@ export function ProjectsClient({
                     <p className="text-xs text-muted">Yarn:</p>
                     <div className="flex -space-x-2">
                       {linked.map((y) => (
-                        <span
-                          key={y.id}
-                          title={`${y.brand} · ${y.colorway}`}
-                          className="h-6 w-6 rounded-full ring-2 ring-white"
-                          style={{ background: y.swatch }}
-                        />
+                        <YarnSwatch key={y.id} yarn={y} size={24} />
                       ))}
                     </div>
                     <p className="ml-auto text-xs text-muted">

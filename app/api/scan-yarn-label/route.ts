@@ -20,6 +20,7 @@ type YarnLabel = {
   colorway: string | null;
   dye_lot: string | null;
   needle_size: string | null;
+  swatch_hex: string | null;
 };
 
 const TOOL = {
@@ -51,6 +52,11 @@ const TOOL = {
       colorway: { type: ["string", "null"] as const, description: "Color name" },
       dye_lot: { type: ["string", "null"] as const, description: "Dye lot code" },
       needle_size: { type: ["string", "null"] as const },
+      swatch_hex: {
+        type: ["string", "null"] as const,
+        description:
+          "The dominant color of the actual yarn fiber as a 6-digit hex (e.g. '#A3B98C' for sage). Look at the yarn itself, not the packaging or label artwork. If multiple colors are present (variegated/self-striping), pick the most prominent.",
+      },
     },
     required: [
       "brand",
@@ -63,6 +69,7 @@ const TOOL = {
       "colorway",
       "dye_lot",
       "needle_size",
+      "swatch_hex",
     ],
   },
 };
@@ -73,7 +80,8 @@ const SYSTEM = `You extract structured yarn-label data from photos of a yarn bal
 - yardage in yards, meters in meters, skein_weight_grams in grams.
 - colorway is the human-readable name (e.g. "Aniversario").
 - dye_lot is the alphanumeric lot code.
-- Infer reasonable values when packaging makes them obvious (metric ↔ imperial conversions).`;
+- Infer reasonable values when packaging makes them obvious (metric ↔ imperial conversions).
+- swatch_hex must be the actual fiber color you see, not the colorway name's literal meaning. If the label says "Sage" but the yarn itself looks olive, return olive's hex.`;
 
 function decodeDataUrl(dataUrl: string) {
   const m = /^data:(image\/[a-zA-Z+.-]+);base64,(.+)$/.exec(dataUrl);
@@ -105,6 +113,7 @@ export async function POST(req: Request) {
       colorway: "Aniversario",
       dye_lot: "0823",
       needle_size: "US 7 (4.5mm)",
+      swatch_hex: "#7E2D5F",
     };
     return NextResponse.json({ label: mock, mocked: true });
   }

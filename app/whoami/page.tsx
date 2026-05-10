@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { hasSupabase, supabaseServer, getUser } from "@/lib/supabase/server";
 import { getYarns } from "@/lib/data";
+import { RecomputeSwatchesButton } from "@/components/RecomputeSwatchesButton";
 
 export const dynamic = "force-dynamic";
 
@@ -162,6 +163,19 @@ export default async function WhoamiPage() {
             getYarns() threw: {stashError}
           </p>
         )}
+      </section>
+
+      <section className="card space-y-3 p-5">
+        <p className="text-xs uppercase tracking-wider text-muted">
+          Maintenance
+        </p>
+        <p className="text-sm text-muted">
+          Old yarns were assigned random gradients. This re-derives each
+          one — by asking Claude to identify the actual color from its
+          photo when one exists, falling back to colorway-name keywords
+          otherwise.
+        </p>
+        <RecomputeSwatchesButton />
       </section>
 
       {errors.length > 0 && (

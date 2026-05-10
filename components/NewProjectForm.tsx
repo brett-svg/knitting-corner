@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import clsx from "clsx";
 import type { Pattern, Yarn } from "@/lib/mock";
+import { YarnSwatch } from "@/components/YarnSwatch";
 
 const STATUSES = ["Planned", "Active", "Paused", "Completed"] as const;
 
@@ -222,10 +223,7 @@ export function NewProjectForm({
                         : "border-border bg-white hover:bg-tint/60"
                     )}
                   >
-                    <span
-                      className="h-10 w-10 shrink-0 rounded-full ring-2 ring-white/70"
-                      style={{ background: y.swatch }}
-                    />
+                    <YarnSwatch yarn={y} size={40} className="ring-white/70" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-display text-base">
                         {y.colorway}
