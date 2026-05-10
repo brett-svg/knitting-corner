@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { hasSupabase, supabaseServer, getUser } from "@/lib/supabase/server";
+import { getYarns } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,30 @@ export default async function WhoamiPage() {
       .limit(5);
     if (error) errors.push(`recent: ${error.message}`);
     recent = data ?? [];
+  }
+
+  // Run the same getYarns() that /stash uses, surface any error
+  let stashYarns: Awaited<ReturnType<typeof getYarns>> = [];
+  let stashError: string | null = null;
+  try {
+    stashYarns = await getYarns();
+  } catch (e) {
+    stashError = e instanceof Error ? e.message : "unknown";
+  }
+
+  // Run the raw query that getYarns runs, no error swallowing
+  let rawCount = 0;
+  let rawError: string | null = null;
+  if (hasSupabase()) {
+    const supabase = await supabaseServer();
+    const { data, error } = await supabase
+      .from("yarns")
+      .select(
+        "id,brand,product_line,colorway,dye_lot,fiber,weight_category,yardage,meters,skein_weight_grams,skeins,reserved,swatch,image_url,storage_location_id,notes,created_at"
+      )
+      .order("created_at", { ascending: false });
+    if (error) rawError = error.message;
+    rawCount = data?.length ?? 0;
   }
 
   return (
@@ -115,6 +140,27 @@ export default async function WhoamiPage() {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section className="card space-y-3 p-5">
+        <p className="text-xs uppercase tracking-wider text-muted">
+          What /stash sees
+        </p>
+        <Row label="Yarns getYarns() returns" value={stashYarns.length.toString()} />
+        <Row
+          label="Raw select (no helper) row count"
+          value={rawCount.toString()}
+        />
+        {rawError && (
+          <p className="rounded-xl border border-accent-rose/50 bg-accent-rose/10 px-3 py-2 text-xs text-accent-rose">
+            Raw select error: {rawError}
+          </p>
+        )}
+        {stashError && (
+          <p className="rounded-xl border border-accent-rose/50 bg-accent-rose/10 px-3 py-2 text-xs text-accent-rose">
+            getYarns() threw: {stashError}
+          </p>
         )}
       </section>
 
