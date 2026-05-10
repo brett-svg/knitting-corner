@@ -23,6 +23,8 @@ type Label = {
 
 type Phase = "capture" | "processing" | "review" | "saved";
 
+const MAX_IMAGES = 4;
+
 type Duplicate = {
   id: string;
   brand: string | null;
@@ -66,7 +68,7 @@ export function ScanClient({
       const dataUrls = await Promise.all(
         files.map((f) => compressToDataUrl(f, 1280, 0.82))
       );
-      setImages((prev) => [...prev, ...dataUrls].slice(0, 2));
+      setImages((prev) => [...prev, ...dataUrls].slice(0, MAX_IMAGES));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not read image");
     } finally {
@@ -142,7 +144,7 @@ export function ScanClient({
               {images.length ? "Add another photo" : "Take a photo"}
             </p>
             <p className="text-sm text-muted">
-              Or pick from your library — up to 2 images
+              Or pick from your library — up to {MAX_IMAGES} images
             </p>
             <input
               id="picker"
@@ -158,7 +160,7 @@ export function ScanClient({
 
           {images.length > 0 && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {images.map((src, i) => (
                   <div key={i} className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -175,15 +177,16 @@ export function ScanClient({
                       ×
                     </button>
                     <span className="absolute bottom-2 left-2 rounded-full bg-white/85 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink">
-                      {i === 0 ? "Front" : "Back"}
+                      {i + 1}
                     </span>
                   </div>
                 ))}
               </div>
-              {images.length < 2 && (
+              {images.length < MAX_IMAGES && (
                 <p className="text-center text-xs text-muted">
-                  Tip: snap the back of the band too — it usually has yardage
-                  and fiber.
+                  {images.length < 2
+                    ? "Tip: snap the back of the band too — yardage and fiber usually live there."
+                    : `Add up to ${MAX_IMAGES - images.length} more if the label wraps around.`}
                 </p>
               )}
               <div className="flex items-center justify-between">
