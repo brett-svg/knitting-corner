@@ -25,6 +25,7 @@ export type Yarn = {
   locationId?: string | null;
   locationName?: string | null;
   reserved?: boolean;
+  notes?: string | null;
   addedAt: string;
 };
 

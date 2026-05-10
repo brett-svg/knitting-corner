@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getPattern, getYarns } from "@/lib/data";
 import { YarnCard } from "@/components/YarnCard";
 import { ColorPreview } from "@/components/ColorPreview";
+import { PatternEditor } from "@/components/PatternEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -190,6 +191,8 @@ export default async function PatternDetailPage({
             : "Add yarns from your stash to mock up how this pattern would look."
         }
       />
+
+      <PatternEditor pattern={pattern} />
     </div>
   );
 }

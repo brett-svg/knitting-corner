@@ -94,6 +94,12 @@ export default async function YarnDetailPage({
               ← Back to stash
             </Link>
           </div>
+
+          {yarn.notes && (
+            <p className="mt-6 max-w-prose whitespace-pre-wrap rounded-xl border border-border bg-white/70 px-4 py-3 text-sm text-ink">
+              {yarn.notes}
+            </p>
+          )}
         </div>
       </div>
 

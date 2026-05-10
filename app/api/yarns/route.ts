@@ -122,6 +122,7 @@ export async function POST(req: Request) {
       swatch,
       image_url: imageUrl,
       storage_location_id: body.locationId || null,
+      notes: typeof body.notes === "string" && body.notes.trim() ? body.notes.trim() : null,
     })
     .select("id")
     .single();

@@ -57,6 +57,7 @@ export function ManualClient({ locations }: { locations: StorageLocation[] }) {
   const [form, setForm] = useState<Form>(EMPTY);
   const [skeins, setSkeins] = useState(1);
   const [locationId, setLocationId] = useState("");
+  const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [duplicate, setDuplicate] = useState<Duplicate | null>(null);
@@ -94,6 +95,7 @@ export function ManualClient({ locations }: { locations: StorageLocation[] }) {
           skeins,
           images: [],
           locationId: locationId || null,
+          notes: notes || null,
           force,
         }),
       });
@@ -268,6 +270,18 @@ export function ManualClient({ locations }: { locations: StorageLocation[] }) {
             onChange={setLocationId}
           />
         </Row>
+        <label className="block text-sm">
+          <span className="text-xs font-medium uppercase tracking-wider text-muted">
+            Notes (optional)
+          </span>
+          <textarea
+            rows={2}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="e.g. gift from Mom, softer than expected"
+            className="mt-1.5 w-full resize-none rounded-xl border border-border bg-white px-3.5 py-2.5 text-ink outline-none transition placeholder:text-muted/70 focus:border-accent-lavender focus:shadow-[0_0_0_4px_rgba(192,132,252,0.15)]"
+          />
+        </label>
 
         {error && (
           <p className="rounded-xl border border-accent-rose/50 bg-accent-rose/10 px-3 py-2 text-sm text-accent-rose">

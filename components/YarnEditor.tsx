@@ -101,6 +101,7 @@ export function YarnEditor({
           skein_weight_grams: numOrNull(fd.get("skein_weight_grams")),
           skeins: Math.max(1, Number(fd.get("skeins") || 1)),
           storage_location_id: strOrNull(fd.get("storage_location_id")),
+          notes: strOrNull(fd.get("notes")),
         });
       }}
       className="card grad-border space-y-5 p-6"
@@ -171,6 +172,19 @@ export function YarnEditor({
             </option>
           ))}
         </select>
+      </label>
+
+      <label className="block text-sm">
+        <span className="text-xs font-medium uppercase tracking-wider text-muted">
+          Notes
+        </span>
+        <textarea
+          name="notes"
+          rows={3}
+          defaultValue={yarn.notes ?? ""}
+          placeholder="Anything to remember about this skein…"
+          className="mt-1.5 w-full resize-none rounded-xl border border-border bg-white px-3.5 py-2.5 text-ink outline-none transition placeholder:text-muted/70 focus:border-accent-lavender focus:shadow-[0_0_0_4px_rgba(192,132,252,0.15)]"
+        />
       </label>
 
       {error && (

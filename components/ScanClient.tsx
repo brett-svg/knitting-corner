@@ -50,6 +50,7 @@ export function ScanClient({
   // Smart defaults that survive across "Add another" loops
   const [defaultLocation, setDefaultLocation] = useState<string>("");
   const [defaultSkeins, setDefaultSkeins] = useState<number>(1);
+  // (Notes are intentionally not carried across — usually skein-specific.)
 
   // Last save state used to drive the success screen
   const [savedLabel, setSavedLabel] = useState<Label | null>(null);
@@ -268,6 +269,7 @@ function Review({
   const [form, setForm] = useState(label);
   const [skeins, setSkeins] = useState(defaultSkeins);
   const [locationId, setLocationId] = useState<string>(defaultLocation);
+  const [notes, setNotes] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [duplicate, setDuplicate] = useState<Duplicate | null>(null);
@@ -288,6 +290,7 @@ function Review({
           skeins,
           images,
           locationId: locationId || null,
+          notes: notes || null,
           force,
         }),
       });
@@ -420,6 +423,18 @@ function Review({
           value={locationId}
           onChange={setLocationId}
         />
+        <label className="block text-sm">
+          <span className="text-xs font-medium uppercase tracking-wider text-muted">
+            Notes (optional)
+          </span>
+          <textarea
+            rows={2}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="e.g. gift from Mom, softer than expected"
+            className="mt-1.5 w-full resize-none rounded-xl border border-border bg-white px-3.5 py-2.5 text-ink outline-none transition placeholder:text-muted/70 focus:border-accent-lavender focus:shadow-[0_0_0_4px_rgba(192,132,252,0.15)]"
+          />
+        </label>
       </div>
 
       {error && (

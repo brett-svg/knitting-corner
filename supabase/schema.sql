@@ -87,6 +87,9 @@ alter table projects add column if not exists recipient text;
 alter table projects add column if not exists gift_date date;
 alter table projects add column if not exists finished_at date;
 
+-- Free-form notes on yarn skeins
+alter table yarns add column if not exists notes text;
+
 create table if not exists projects (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,

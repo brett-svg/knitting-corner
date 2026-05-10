@@ -34,6 +34,7 @@ type YarnRow = {
   image_url: string | null;
   storage_location_id: string | null;
   storage_locations: { name: string } | null;
+  notes: string | null;
   created_at: string;
 };
 
@@ -71,6 +72,7 @@ function rowToYarn(r: YarnRow): Yarn {
     locationId: r.storage_location_id,
     locationName: r.storage_locations?.name ?? null,
     reserved: r.reserved ?? false,
+    notes: r.notes,
     addedAt: r.created_at.slice(0, 10),
   };
 }
@@ -81,7 +83,7 @@ export async function getYarns(): Promise<Yarn[]> {
   const { data, error } = await supabase
     .from("yarns")
     .select(
-      "id,brand,product_line,colorway,dye_lot,fiber,weight_category,yardage,meters,skein_weight_grams,skeins,reserved,swatch,image_url,storage_location_id,storage_locations(name),created_at"
+      "id,brand,product_line,colorway,dye_lot,fiber,weight_category,yardage,meters,skein_weight_grams,skeins,reserved,swatch,image_url,storage_location_id,storage_locations(name),notes,created_at"
     )
     .order("created_at", { ascending: false });
   if (error) {
@@ -210,7 +212,7 @@ export async function getYarn(id: string): Promise<Yarn | null> {
   const { data, error } = await supabase
     .from("yarns")
     .select(
-      "id,brand,product_line,colorway,dye_lot,fiber,weight_category,yardage,meters,skein_weight_grams,skeins,reserved,swatch,image_url,storage_location_id,storage_locations(name),created_at"
+      "id,brand,product_line,colorway,dye_lot,fiber,weight_category,yardage,meters,skein_weight_grams,skeins,reserved,swatch,image_url,storage_location_id,storage_locations(name),notes,created_at"
     )
     .eq("id", id)
     .maybeSingle();
