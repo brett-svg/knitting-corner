@@ -89,7 +89,7 @@ export function StashClient({ yarns }: { yarns: Yarn[] }) {
           <p className="text-xs uppercase tracking-[0.18em] text-muted">
             Inventory
           </p>
-          <h1 className="mt-1 font-display text-5xl tracking-tight">
+          <h1 className="mt-1 font-display text-4xl tracking-tight md:text-5xl">
             Your <span className="italic text-grad">stash</span>
           </h1>
           <p className="mt-2 text-muted">

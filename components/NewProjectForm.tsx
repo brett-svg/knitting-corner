@@ -74,7 +74,7 @@ export function NewProjectForm({
         <p className="text-xs uppercase tracking-[0.18em] text-muted">
           Workshop
         </p>
-        <h1 className="mt-1 font-display text-5xl tracking-tight">
+        <h1 className="mt-1 font-display text-4xl tracking-tight md:text-5xl">
           Start a <span className="italic text-grad">project</span>
         </h1>
       </header>

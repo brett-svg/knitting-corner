@@ -119,7 +119,7 @@ export function ScanClient({
         <p className="text-xs uppercase tracking-[0.18em] text-muted">
           Scan label
         </p>
-        <h1 className="mt-1 font-display text-5xl tracking-tight">
+        <h1 className="mt-1 font-display text-4xl tracking-tight md:text-5xl">
           Point at the <span className="italic text-grad">ball band</span>
         </h1>
         <p className="mt-2 text-muted">

@@ -28,7 +28,7 @@ export function ToolsClient({
           <p className="text-xs uppercase tracking-[0.18em] text-muted">
             Toolkit
           </p>
-          <h1 className="mt-1 font-display text-5xl tracking-tight">
+          <h1 className="mt-1 font-display text-4xl tracking-tight md:text-5xl">
             Your <span className="italic text-grad">tools</span>
           </h1>
           <p className="mt-2 text-muted">

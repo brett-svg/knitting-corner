@@ -66,7 +66,7 @@ export default async function YarnDetailPage({
           <p className="text-xs uppercase tracking-[0.18em] text-muted">
             {yarn.brand} · {yarn.productLine}
           </p>
-          <h1 className="mt-1 font-display text-5xl tracking-tight">
+          <h1 className="mt-1 font-display text-4xl tracking-tight md:text-5xl">
             {yarn.colorway}
           </h1>
           <p className="mt-2 text-muted">{yarn.fiber}</p>

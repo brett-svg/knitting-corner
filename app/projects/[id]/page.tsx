@@ -40,7 +40,7 @@ export default async function ProjectDetailPage({
           <p className="text-xs uppercase tracking-[0.18em] text-muted">
             {project.pattern}
           </p>
-          <h1 className="mt-1 font-display text-5xl tracking-tight">
+          <h1 className="mt-1 font-display text-4xl tracking-tight md:text-5xl">
             {project.name}
           </h1>
           {(project.recipient || project.giftDate) && (
