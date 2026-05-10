@@ -6,7 +6,7 @@ export function YarnSwatch({
   size = 40,
   className,
 }: {
-  yarn: Pick<Yarn, "swatch" | "imageUrl" | "colorway">;
+  yarn: Pick<Yarn, "swatch" | "colorway">;
   size?: number;
   className?: string;
 }) {
@@ -21,10 +21,7 @@ export function YarnSwatch({
       style={{
         width: size,
         height: size,
-        background: yarn.imageUrl ? undefined : yarn.swatch,
-        backgroundImage: yarn.imageUrl ? `url(${yarn.imageUrl})` : undefined,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
+        background: yarn.swatch,
       }}
     />
   );
