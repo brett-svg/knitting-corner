@@ -33,13 +33,19 @@ export default function ScanPage() {
     setError(null);
     try {
       const dataUrls = await Promise.all(
-        files.slice(0, 2).map((f) => compressToDataUrl(f, 1280, 0.82))
+        files.map((f) => compressToDataUrl(f, 1280, 0.82))
       );
-      setImages(dataUrls);
+      setImages((prev) => [...prev, ...dataUrls].slice(0, 2));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not read image");
+    } finally {
+      // Allow re-picking the same file (and triggering onChange again)
       if (fileRef.current) fileRef.current.value = "";
     }
+  }
+
+  function removeImage(idx: number) {
+    setImages((prev) => prev.filter((_, i) => i !== idx));
   }
 
   async function process() {
@@ -117,15 +123,32 @@ export default function ScanPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 {images.map((src, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={i}
-                    src={src}
-                    alt={`Capture ${i + 1}`}
-                    className="aspect-square w-full rounded-2xl border border-border object-cover"
-                  />
+                  <div key={i} className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={src}
+                      alt={`Capture ${i + 1}`}
+                      className="aspect-square w-full rounded-2xl border border-border object-cover"
+                    />
+                    <button
+                      onClick={() => removeImage(i)}
+                      aria-label={`Remove photo ${i + 1}`}
+                      className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white shadow-soft transition hover:bg-black/75"
+                    >
+                      ×
+                    </button>
+                    <span className="absolute bottom-2 left-2 rounded-full bg-white/85 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink">
+                      {i === 0 ? "Front" : "Back"}
+                    </span>
+                  </div>
                 ))}
               </div>
+              {images.length < 2 && (
+                <p className="text-center text-xs text-muted">
+                  Tip: snap the back of the band too — it usually has yardage
+                  and fiber.
+                </p>
+              )}
               <div className="flex items-center justify-between">
                 <button onClick={reset} className="btn-ghost">
                   Start over
