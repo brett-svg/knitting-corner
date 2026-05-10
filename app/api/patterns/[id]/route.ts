@@ -11,6 +11,12 @@ const ALLOWED = new Set([
   "required_yardage",
   "needle_size",
   "notes",
+  "gauge",
+  "sizes",
+  "construction",
+  "techniques",
+  "garment_type",
+  "recommended_yarn",
 ]);
 
 export async function PATCH(

@@ -164,8 +164,17 @@ type PatternRow = {
   required_yardage: number | null;
   needle_size: string | null;
   notes: string | null;
+  gauge: string | null;
+  sizes: string | null;
+  construction: string | null;
+  techniques: string | null;
+  garment_type: string | null;
+  recommended_yarn: string | null;
   created_at: string;
 };
+
+const PATTERN_COLUMNS =
+  "id,name,designer,external_url,pdf_path,cover_url,yarn_weight,required_yardage,needle_size,notes,gauge,sizes,construction,techniques,garment_type,recommended_yarn,created_at";
 
 const COVERS = [
   "linear-gradient(135deg,#FFE4E6 0%,#FDBA74 55%,#C084FC 100%)",
@@ -193,6 +202,12 @@ function rowToPattern(r: PatternRow): Pattern {
     needleSize: r.needle_size,
     notes: r.notes,
     cover: coverFor(r.name + r.id),
+    gauge: r.gauge,
+    sizes: r.sizes,
+    construction: r.construction,
+    techniques: r.techniques,
+    garmentType: r.garment_type,
+    recommendedYarn: r.recommended_yarn,
     createdAt: r.created_at.slice(0, 10),
   };
 }
@@ -203,7 +218,7 @@ export async function getPatterns(): Promise<Pattern[]> {
   const { data, error } = await supabase
     .from("patterns")
     .select(
-      "id,name,designer,external_url,pdf_path,cover_url,yarn_weight,required_yardage,needle_size,notes,created_at"
+      PATTERN_COLUMNS
     )
     .order("created_at", { ascending: false });
   if (error) {
@@ -221,7 +236,7 @@ export async function getPattern(id: string): Promise<Pattern | null> {
   const { data, error } = await supabase
     .from("patterns")
     .select(
-      "id,name,designer,external_url,pdf_path,cover_url,yarn_weight,required_yardage,needle_size,notes,created_at"
+      PATTERN_COLUMNS
     )
     .eq("id", id)
     .maybeSingle();

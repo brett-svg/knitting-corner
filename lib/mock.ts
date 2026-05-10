@@ -257,6 +257,12 @@ export type Pattern = {
   notes: string | null;
   cover: string;
   coverUrl?: string | null;
+  gauge?: string | null;
+  sizes?: string | null;
+  construction?: string | null;
+  techniques?: string | null;
+  garmentType?: string | null;
+  recommendedYarn?: string | null;
   createdAt: string;
 };
 

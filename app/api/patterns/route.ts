@@ -44,6 +44,12 @@ export async function POST(req: Request) {
   const needle_size = strOrNull(fd.get("needle_size"));
   const notes = strOrNull(fd.get("notes"));
   const yardage = numOrNull(fd.get("required_yardage"));
+  const gauge = strOrNull(fd.get("gauge"));
+  const sizes = strOrNull(fd.get("sizes"));
+  const construction = strOrNull(fd.get("construction"));
+  const techniques = strOrNull(fd.get("techniques"));
+  const garment_type = strOrNull(fd.get("garment_type"));
+  const recommended_yarn = strOrNull(fd.get("recommended_yarn"));
 
   let pdf_path: string | null = null;
   let cover_url: string | null = null;
@@ -96,6 +102,12 @@ export async function POST(req: Request) {
       required_yardage: yardage,
       needle_size,
       notes,
+      gauge,
+      sizes,
+      construction,
+      techniques,
+      garment_type,
+      recommended_yarn,
     })
     .select("id")
     .single();

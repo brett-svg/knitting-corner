@@ -109,6 +109,33 @@ export default async function PatternDetailPage({
         </div>
       </header>
 
+      {(pattern.gauge ||
+        pattern.sizes ||
+        pattern.construction ||
+        pattern.techniques ||
+        pattern.garmentType ||
+        pattern.recommendedYarn) && (
+        <section className="card grid gap-3 p-5 md:grid-cols-2">
+          {pattern.garmentType && (
+            <Detail label="Type" value={pattern.garmentType} />
+          )}
+          {pattern.construction && (
+            <Detail label="Construction" value={pattern.construction} />
+          )}
+          {pattern.sizes && <Detail label="Sizes" value={pattern.sizes} />}
+          {pattern.gauge && <Detail label="Gauge" value={pattern.gauge} />}
+          {pattern.recommendedYarn && (
+            <Detail
+              label="Recommended yarn"
+              value={pattern.recommendedYarn}
+            />
+          )}
+          {pattern.techniques && (
+            <Detail label="Techniques" value={pattern.techniques} />
+          )}
+        </section>
+      )}
+
       <section>
         <div className="mb-5 flex items-end justify-between">
           <div>
@@ -193,6 +220,17 @@ export default async function PatternDetailPage({
       />
 
       <PatternEditor pattern={pattern} />
+    </div>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[11px] uppercase tracking-wider text-muted">
+        {label}
+      </dt>
+      <dd className="mt-0.5 text-sm text-ink">{value}</dd>
     </div>
   );
 }

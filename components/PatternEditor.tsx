@@ -34,6 +34,12 @@ export function PatternEditor({ pattern }: { pattern: Pattern }) {
         required_yardage: numOrNull(fd.get("required_yardage")),
         needle_size: strOrNull(fd.get("needle_size")),
         notes: strOrNull(fd.get("notes")),
+        gauge: strOrNull(fd.get("gauge")),
+        sizes: strOrNull(fd.get("sizes")),
+        construction: strOrNull(fd.get("construction")),
+        techniques: strOrNull(fd.get("techniques")),
+        garment_type: strOrNull(fd.get("garment_type")),
+        recommended_yarn: strOrNull(fd.get("recommended_yarn")),
       };
       if (!payload.name) throw new Error("Name is required");
       const res = await fetch(`/api/patterns/${pattern.id}`, {
@@ -134,10 +140,42 @@ export function PatternEditor({ pattern }: { pattern: Pattern }) {
           defaultValue={pattern.requiredYardage?.toString() ?? ""}
         />
       </Row>
+      <Row>
+        <Field
+          name="needle_size"
+          label="Needle size"
+          defaultValue={pattern.needleSize ?? ""}
+        />
+        <Field
+          name="garment_type"
+          label="Garment type"
+          defaultValue={pattern.garmentType ?? ""}
+        />
+      </Row>
       <Field
-        name="needle_size"
-        label="Needle size"
-        defaultValue={pattern.needleSize ?? ""}
+        name="gauge"
+        label="Gauge"
+        defaultValue={pattern.gauge ?? ""}
+      />
+      <Field
+        name="sizes"
+        label="Sizes"
+        defaultValue={pattern.sizes ?? ""}
+      />
+      <Field
+        name="construction"
+        label="Construction"
+        defaultValue={pattern.construction ?? ""}
+      />
+      <Field
+        name="techniques"
+        label="Techniques"
+        defaultValue={pattern.techniques ?? ""}
+      />
+      <Field
+        name="recommended_yarn"
+        label="Recommended yarn"
+        defaultValue={pattern.recommendedYarn ?? ""}
       />
       <label className="block text-sm">
         <span className="text-xs font-medium uppercase tracking-wider text-muted">
