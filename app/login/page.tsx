@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabaseBrowser } from "@/lib/supabase/browser";
-
-type Mode = "signin" | "signup" | "magic";
+type Mode = "signin" | "signup";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,41 +33,16 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
     setInfo(null);
-    const supabase = supabaseBrowser();
     try {
-      if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-        router.replace(next());
-        router.refresh();
-      } else if (mode === "signup") {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-        if (error) throw error;
-        if (data.session) {
-          router.replace(next());
-          router.refresh();
-        } else {
-          setInfo(
-            "Account created — check your email to confirm, then sign in."
-          );
-          setMode("signin");
-        }
-      } else {
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next())}`,
-          },
-        });
-        if (error) throw error;
-        setInfo(`Magic link sent to ${email}.`);
-      }
+      const res = await fetch(`/api/auth/${mode}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Something went wrong");
+      router.replace(next());
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -91,9 +64,7 @@ export default function LoginPage() {
           <p className="text-sm text-muted">
             {mode === "signin"
               ? "Sign in with your email and password."
-              : mode === "signup"
-                ? "Create a new account."
-                : "We'll email you a one-time link."}
+              : "Create a new account."}
           </p>
         </div>
 
@@ -113,7 +84,7 @@ export default function LoginPage() {
             />
           </label>
 
-          {mode !== "magic" && (
+          {(
             <label className="block text-sm">
               <span className="text-xs font-medium uppercase tracking-wider text-muted">
                 Password
@@ -138,13 +109,7 @@ export default function LoginPage() {
             disabled={busy}
             className="btn-grad w-full disabled:opacity-60"
           >
-            {busy
-              ? "Working…"
-              : mode === "signin"
-                ? "Sign in →"
-                : mode === "signup"
-                  ? "Create account →"
-                  : "Send magic link →"}
+            {busy ? "Working…" : mode === "signin" ? "Sign in →" : "Create account →"}
           </button>
 
           {error && (
@@ -161,20 +126,12 @@ export default function LoginPage() {
 
         <div className="space-y-1 border-t border-border pt-4 text-center text-sm text-muted">
           {mode === "signin" && (
-            <>
-              <button
-                onClick={() => switchMode("signup")}
-                className="block w-full hover:text-ink"
-              >
-                New here? Create an account
-              </button>
-              <button
-                onClick={() => switchMode("magic")}
-                className="block w-full hover:text-ink"
-              >
-                Email me a magic link instead
-              </button>
-            </>
+            <button
+              onClick={() => switchMode("signup")}
+              className="block w-full hover:text-ink"
+            >
+              New here? Create an account
+            </button>
           )}
           {mode === "signup" && (
             <button
@@ -182,14 +139,6 @@ export default function LoginPage() {
               className="block w-full hover:text-ink"
             >
               Already have an account? Sign in
-            </button>
-          )}
-          {mode === "magic" && (
-            <button
-              onClick={() => switchMode("signin")}
-              className="block w-full hover:text-ink"
-            >
-              Use email + password instead
             </button>
           )}
         </div>

@@ -1,18 +1,12 @@
 import Link from "next/link";
 import { getProjects, getStats, getYarns } from "@/lib/data";
-import { getUser } from "@/lib/supabase/server";
+import { getUser } from "@/lib/auth";
 import { YarnCard } from "@/components/YarnCard";
 
 export const dynamic = "force-dynamic";
 
 function displayName(user: Awaited<ReturnType<typeof getUser>>) {
   if (!user) return "friend";
-  const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
-  const fromMeta =
-    (typeof meta.full_name === "string" && meta.full_name) ||
-    (typeof meta.name === "string" && meta.name) ||
-    (typeof meta.first_name === "string" && meta.first_name);
-  if (fromMeta) return String(fromMeta).split(" ")[0];
   const prefix = (user.email ?? "").split("@")[0];
   if (!prefix) return "friend";
   return prefix.charAt(0).toUpperCase() + prefix.slice(1);

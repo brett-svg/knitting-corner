@@ -1,4 +1,10 @@
-import { hasSupabase, supabaseServer } from "@/lib/supabase/server";
+// Read side of the app. Every query is scoped to the signed-in user; with no
+// DATABASE_URL the app runs on mock data so the UI can be kicked around.
+
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { db, hasDb, schema } from "@/lib/db";
+import { getUser } from "@/lib/auth";
+import { fileUrl } from "@/lib/storage";
 import {
   yarns as mockYarns,
   projects as mockProjects,
@@ -17,164 +23,184 @@ import {
   type WeightCategory,
 } from "@/lib/mock";
 
-type YarnRow = {
-  id: string;
-  brand: string | null;
-  product_line: string | null;
-  colorway: string | null;
-  dye_lot: string | null;
-  fiber: string | null;
-  weight_category: string | null;
-  yardage: number | null;
-  meters: number | null;
-  skein_weight_grams: number | null;
-  skeins: number | null;
-  reserved: boolean | null;
-  swatch: string | null;
-  image_url: string | null;
-  storage_location_id: string | null;
-  notes: string | null;
-  created_at: string;
-};
+const { yarns, projects, patterns, needles, hooks, notions, storageLocations, projectYarns } =
+  schema;
 
-const YARN_COLUMNS =
-  "id,brand,product_line,colorway,dye_lot,fiber,weight_category,yardage,meters,skein_weight_grams,skeins,reserved,swatch,image_url,storage_location_id,notes,created_at";
+type YarnRow = typeof yarns.$inferSelect;
+type PatternRow = typeof patterns.$inferSelect;
+type ProjectRow = typeof projects.$inferSelect;
 
-type ProjectRow = {
-  id: string;
-  name: string;
-  status: Project["status"];
-  progress: number;
-  hero: string | null;
-  image_url: string | null;
-  updated_at: string;
-  recipient: string | null;
-  gift_date: string | null;
-  finished_at: string | null;
-  patterns: { name: string; designer: string | null } | null;
-  project_yarns: { yarn_id: string }[] | null;
-};
+const FALLBACK_GRADIENT = "linear-gradient(135deg,#C084FC,#60A5FA)";
+
+async function uid(): Promise<string | null> {
+  const u = await getUser();
+  return u?.id ?? null;
+}
+
+const day = (d: Date | string) => new Date(d).toISOString().slice(0, 10);
 
 function rowToYarn(r: YarnRow, locationName: string | null = null): Yarn {
   return {
     id: r.id,
     brand: r.brand ?? "",
-    productLine: r.product_line ?? "",
+    productLine: r.productLine ?? "",
     colorway: r.colorway ?? "",
-    dyeLot: r.dye_lot ?? "",
+    dyeLot: r.dyeLot ?? "",
     fiber: r.fiber ?? "",
-    weight: (r.weight_category ?? "DK") as Yarn["weight"],
+    weight: (r.weightCategory ?? "DK") as Yarn["weight"],
     yardage: r.yardage ?? 0,
     meters: r.meters ?? 0,
-    skeinGrams: r.skein_weight_grams ?? 0,
+    skeinGrams: r.skeinWeightGrams ?? 0,
     skeins: r.skeins ?? 1,
     storage: locationName ?? "",
-    swatch: r.swatch ?? "linear-gradient(135deg,#C084FC,#60A5FA)",
-    imageUrl: r.image_url ?? null,
-    locationId: r.storage_location_id,
+    swatch: r.swatch ?? FALLBACK_GRADIENT,
+    imageUrl: fileUrl(r.imageKey),
+    locationId: r.storageLocationId,
     locationName,
     reserved: r.reserved ?? false,
     notes: r.notes,
-    addedAt: r.created_at.slice(0, 10),
+    addedAt: day(r.createdAt),
   };
 }
 
-async function locationNameMap(
-  supabase: Awaited<ReturnType<typeof supabaseServer>>,
-  ids: Array<string | null>
-): Promise<Map<string, string>> {
-  const unique = Array.from(
-    new Set(ids.filter((id): id is string => Boolean(id)))
-  );
+async function locationNameMap(userId: string, ids: Array<string | null>) {
+  const unique = Array.from(new Set(ids.filter((id): id is string => Boolean(id))));
   const map = new Map<string, string>();
-  if (unique.length === 0) return map;
-  const { data, error } = await supabase
-    .from("storage_locations")
-    .select("id,name")
-    .in("id", unique);
-  if (error) {
-    console.error("[data] locationNameMap:", error.message);
-    return map;
-  }
-  for (const r of data ?? []) map.set(r.id, r.name);
+  if (!unique.length) return map;
+  const rows = await db()
+    .select({ id: storageLocations.id, name: storageLocations.name })
+    .from(storageLocations)
+    .where(and(eq(storageLocations.userId, userId), inArray(storageLocations.id, unique)));
+  for (const r of rows) map.set(r.id, r.name);
   return map;
 }
 
 export async function getYarns(): Promise<Yarn[]> {
-  if (!hasSupabase()) return mockYarns;
-  const supabase = await supabaseServer();
-  const { data, error } = await supabase
-    .from("yarns")
-    .select(YARN_COLUMNS)
-    .order("created_at", { ascending: false });
-  if (error) {
-    console.error("[data] getYarns:", error.message);
-    return [];
-  }
-  const rows = (data ?? []) as unknown as YarnRow[];
+  if (!hasDb()) return mockYarns;
+  const userId = await uid();
+  if (!userId) return [];
+  const rows = await db()
+    .select()
+    .from(yarns)
+    .where(eq(yarns.userId, userId))
+    .orderBy(desc(yarns.createdAt));
   const locations = await locationNameMap(
-    supabase,
-    rows.map((r) => r.storage_location_id)
+    userId,
+    rows.map((r) => r.storageLocationId)
   );
   return rows.map((r) =>
-    rowToYarn(r, r.storage_location_id ? locations.get(r.storage_location_id) ?? null : null)
+    rowToYarn(r, r.storageLocationId ? locations.get(r.storageLocationId) ?? null : null)
+  );
+}
+
+export async function getYarn(id: string): Promise<Yarn | null> {
+  if (!hasDb()) return mockYarns.find((y) => y.id === id) ?? null;
+  const userId = await uid();
+  if (!userId) return null;
+  const row = await db().query.yarns.findFirst({
+    where: and(eq(yarns.id, id), eq(yarns.userId, userId)),
+  });
+  if (!row) return null;
+  let locName: string | null = null;
+  if (row.storageLocationId) {
+    const map = await locationNameMap(userId, [row.storageLocationId]);
+    locName = map.get(row.storageLocationId) ?? null;
+  }
+  return rowToYarn(row, locName);
+}
+
+// ── Projects ──────────────────────────────────────────────────────────────
+
+type ProjectWithRels = ProjectRow & {
+  pattern: { name: string; designer: string | null } | null;
+  projectYarns: { yarnId: string }[];
+};
+
+function rowToProject(p: ProjectWithRels): Project {
+  return {
+    id: p.id,
+    name: p.name,
+    pattern: p.pattern?.designer ?? p.pattern?.name ?? "—",
+    status: p.status as Project["status"],
+    progress: Number(p.progress ?? 0),
+    yarnIds: p.projectYarns.map((j) => j.yarnId),
+    hero: p.hero ?? fileUrl(p.imageKey) ?? FALLBACK_GRADIENT,
+    updatedAt: day(p.updatedAt),
+    recipient: p.recipient,
+    giftDate: p.giftDate,
+    finishedAt: p.finishedAt,
+  };
+}
+
+async function loadProjects(userId: string, ids?: string[]): Promise<Project[]> {
+  const where = ids
+    ? and(eq(projects.userId, userId), inArray(projects.id, ids))
+    : eq(projects.userId, userId);
+  const rows = await db().select().from(projects).where(where).orderBy(desc(projects.updatedAt));
+  if (!rows.length) return [];
+
+  const patternIds = Array.from(
+    new Set(rows.map((r) => r.patternId).filter((x): x is string => Boolean(x)))
+  );
+  const [patternRows, linkRows] = await Promise.all([
+    patternIds.length
+      ? db()
+          .select({ id: patterns.id, name: patterns.name, designer: patterns.designer })
+          .from(patterns)
+          .where(inArray(patterns.id, patternIds))
+      : Promise.resolve([]),
+    db()
+      .select()
+      .from(projectYarns)
+      .where(inArray(projectYarns.projectId, rows.map((r) => r.id))),
+  ]);
+  const patternById = new Map(patternRows.map((p) => [p.id, p]));
+  const linksByProject = new Map<string, { yarnId: string }[]>();
+  for (const l of linkRows) {
+    const list = linksByProject.get(l.projectId) ?? [];
+    list.push({ yarnId: l.yarnId });
+    linksByProject.set(l.projectId, list);
+  }
+  return rows.map((r) =>
+    rowToProject({
+      ...r,
+      pattern: r.patternId ? patternById.get(r.patternId) ?? null : null,
+      projectYarns: linksByProject.get(r.id) ?? [],
+    })
   );
 }
 
 export async function getProjects(): Promise<Project[]> {
-  if (!hasSupabase()) return mockProjects;
-  const supabase = await supabaseServer();
-  const { data, error } = await supabase
-    .from("projects")
-    .select(
-      "id,name,status,progress,hero,image_url,updated_at,recipient,gift_date,finished_at,patterns(name,designer),project_yarns(yarn_id)"
-    )
-    .order("updated_at", { ascending: false });
-  if (error) {
-    console.error("[data] getProjects:", error.message);
-    return [];
-  }
-  return ((data ?? []) as unknown as ProjectRow[]).map(rowToProject);
+  if (!hasDb()) return mockProjects;
+  const userId = await uid();
+  if (!userId) return [];
+  return loadProjects(userId);
 }
 
-function rowToProject(p: ProjectRow): Project {
-  return {
-    id: p.id,
-    name: p.name,
-    pattern: p.patterns?.designer ?? p.patterns?.name ?? "—",
-    status: p.status,
-    progress: Number(p.progress ?? 0),
-    yarnIds: (p.project_yarns ?? []).map((j) => j.yarn_id),
-    hero: p.hero ?? p.image_url ?? "linear-gradient(135deg,#C084FC,#60A5FA)",
-    updatedAt: p.updated_at.slice(0, 10),
-    recipient: p.recipient,
-    giftDate: p.gift_date,
-    finishedAt: p.finished_at,
-  };
+export async function getProject(id: string): Promise<Project | null> {
+  if (!hasDb()) return mockProjects.find((p) => p.id === id) ?? null;
+  const userId = await uid();
+  if (!userId) return null;
+  const [p] = await loadProjects(userId, [id]);
+  return p ?? null;
 }
 
-type PatternRow = {
-  id: string;
-  name: string;
-  designer: string | null;
-  external_url: string | null;
-  pdf_path: string | null;
-  cover_url: string | null;
-  yarn_weight: string | null;
-  required_yardage: number | null;
-  needle_size: string | null;
-  notes: string | null;
-  gauge: string | null;
-  sizes: string | null;
-  construction: string | null;
-  techniques: string | null;
-  garment_type: string | null;
-  recommended_yarn: string | null;
-  created_at: string;
-};
+export async function getProjectsUsingYarn(yarnId: string): Promise<Project[]> {
+  if (!hasDb()) return mockProjects.filter((p) => p.yarnIds.includes(yarnId));
+  const userId = await uid();
+  if (!userId) return [];
+  const links = await db()
+    .select({ projectId: projectYarns.projectId })
+    .from(projectYarns)
+    .where(eq(projectYarns.yarnId, yarnId));
+  if (!links.length) return [];
+  return loadProjects(
+    userId,
+    links.map((l) => l.projectId)
+  );
+}
 
-const PATTERN_COLUMNS =
-  "id,name,designer,external_url,pdf_path,cover_url,yarn_weight,required_yardage,needle_size,notes,gauge,sizes,construction,techniques,garment_type,recommended_yarn,created_at";
+// ── Patterns ──────────────────────────────────────────────────────────────
 
 const COVERS = [
   "linear-gradient(135deg,#FFE4E6 0%,#FDBA74 55%,#C084FC 100%)",
@@ -194,192 +220,107 @@ function rowToPattern(r: PatternRow): Pattern {
     id: r.id,
     name: r.name,
     designer: r.designer,
-    externalUrl: r.external_url,
-    pdfPath: r.pdf_path,
-    coverUrl: r.cover_url ?? null,
-    yarnWeight: (r.yarn_weight ?? null) as WeightCategory | null,
-    requiredYardage: r.required_yardage,
-    needleSize: r.needle_size,
+    externalUrl: r.externalUrl,
+    pdfPath: r.pdfKey,
+    coverUrl: fileUrl(r.coverKey),
+    yarnWeight: (r.yarnWeight ?? null) as WeightCategory | null,
+    requiredYardage: r.requiredYardage,
+    needleSize: r.needleSize,
     notes: r.notes,
     cover: coverFor(r.name + r.id),
     gauge: r.gauge,
     sizes: r.sizes,
     construction: r.construction,
     techniques: r.techniques,
-    garmentType: r.garment_type,
-    recommendedYarn: r.recommended_yarn,
-    createdAt: r.created_at.slice(0, 10),
+    garmentType: r.garmentType,
+    recommendedYarn: r.recommendedYarn,
+    createdAt: day(r.createdAt),
   };
 }
 
 export async function getPatterns(): Promise<Pattern[]> {
-  if (!hasSupabase()) return mockPatterns;
-  const supabase = await supabaseServer();
-  const { data, error } = await supabase
-    .from("patterns")
-    .select(
-      PATTERN_COLUMNS
-    )
-    .order("created_at", { ascending: false });
-  if (error) {
-    console.error("[data] getPatterns:", error.message);
-    return [];
-  }
-  return ((data ?? []) as unknown as PatternRow[]).map(rowToPattern);
+  if (!hasDb()) return mockPatterns;
+  const userId = await uid();
+  if (!userId) return [];
+  const rows = await db()
+    .select()
+    .from(patterns)
+    .where(eq(patterns.userId, userId))
+    .orderBy(desc(patterns.createdAt));
+  return rows.map(rowToPattern);
 }
 
 export async function getPattern(id: string): Promise<Pattern | null> {
-  if (!hasSupabase()) {
-    return mockPatterns.find((p) => p.id === id) ?? null;
-  }
-  const supabase = await supabaseServer();
-  const { data, error } = await supabase
-    .from("patterns")
-    .select(
-      PATTERN_COLUMNS
-    )
-    .eq("id", id)
-    .maybeSingle();
-  if (error) {
-    console.error("[data] getPattern:", error.message);
-    return null;
-  }
-  return data ? rowToPattern(data as PatternRow) : null;
-}
-
-export async function getYarn(id: string): Promise<Yarn | null> {
-  if (!hasSupabase()) {
-    return mockYarns.find((y) => y.id === id) ?? null;
-  }
-  const supabase = await supabaseServer();
-  const { data, error } = await supabase
-    .from("yarns")
-    .select(YARN_COLUMNS)
-    .eq("id", id)
-    .maybeSingle();
-  if (error || !data) {
-    if (error) console.error("[data] getYarn:", error.message);
-    return null;
-  }
-  const row = data as unknown as YarnRow;
-  let locName: string | null = null;
-  if (row.storage_location_id) {
-    const map = await locationNameMap(supabase, [row.storage_location_id]);
-    locName = map.get(row.storage_location_id) ?? null;
-  }
-  return rowToYarn(row, locName);
-}
-
-export async function getProjectsUsingYarn(yarnId: string): Promise<Project[]> {
-  if (!hasSupabase()) {
-    return mockProjects.filter((p) => p.yarnIds.includes(yarnId));
-  }
-  const supabase = await supabaseServer();
-  const { data, error } = await supabase
-    .from("project_yarns")
-    .select(
-      "project_id, projects(id,name,status,progress,hero,image_url,updated_at,recipient,gift_date,finished_at,patterns(name,designer))"
-    )
-    .eq("yarn_id", yarnId);
-  if (error || !data) return [];
-  return data.flatMap<Project>((r) => {
-    const p = (r as unknown as { projects: ProjectRow | null }).projects;
-    if (!p) return [];
-    return [{ ...rowToProject(p), yarnIds: [] }];
+  if (!hasDb()) return mockPatterns.find((p) => p.id === id) ?? null;
+  const userId = await uid();
+  if (!userId) return null;
+  const row = await db().query.patterns.findFirst({
+    where: and(eq(patterns.id, id), eq(patterns.userId, userId)),
   });
+  return row ? rowToPattern(row) : null;
 }
 
-export async function getProject(id: string): Promise<Project | null> {
-  if (!hasSupabase()) {
-    return mockProjects.find((p) => p.id === id) ?? null;
-  }
-  const supabase = await supabaseServer();
-  const { data, error } = await supabase
-    .from("projects")
-    .select(
-      "id,name,status,progress,hero,image_url,updated_at,recipient,gift_date,finished_at,patterns(name,designer),project_yarns(yarn_id)"
-    )
-    .eq("id", id)
-    .maybeSingle();
-  if (error || !data) {
-    if (error) console.error("[data] getProject:", error.message);
-    return null;
-  }
-  return rowToProject(data as unknown as ProjectRow);
-}
+// ── Tools & locations ─────────────────────────────────────────────────────
 
 export async function getNeedles(): Promise<Needle[]> {
-  if (!hasSupabase()) return mockNeedles;
-  const supabase = await supabaseServer();
-  const { data, error } = await supabase
-    .from("needles")
-    .select("id,size_us,size_mm,type,length_cm,material,quantity")
-    .order("size_mm", { ascending: true });
-  if (error) {
-    console.error("[data] getNeedles:", error.message);
-    return [];
-  }
-  return (data ?? []).map((r) => ({
+  if (!hasDb()) return mockNeedles;
+  const userId = await uid();
+  if (!userId) return [];
+  const rows = await db()
+    .select()
+    .from(needles)
+    .where(eq(needles.userId, userId))
+    .orderBy(asc(needles.sizeMm));
+  return rows.map((r) => ({
     id: r.id,
-    sizeUs: r.size_us,
-    sizeMm: r.size_mm == null ? null : Number(r.size_mm),
-    type: r.type,
-    lengthCm: r.length_cm,
+    sizeUs: r.sizeUs,
+    sizeMm: r.sizeMm == null ? null : Number(r.sizeMm),
+    type: r.type as Needle["type"],
+    lengthCm: r.lengthCm,
     material: r.material,
     quantity: r.quantity ?? 1,
   }));
 }
 
 export async function getHooks(): Promise<Hook[]> {
-  if (!hasSupabase()) return mockHooks;
-  const supabase = await supabaseServer();
-  const { data, error } = await supabase
-    .from("hooks")
-    .select("id,size_us,size_mm,material,quantity")
-    .order("size_mm", { ascending: true });
-  if (error) {
-    console.error("[data] getHooks:", error.message);
-    return [];
-  }
-  return (data ?? []).map((r) => ({
+  if (!hasDb()) return mockHooks;
+  const userId = await uid();
+  if (!userId) return [];
+  const rows = await db()
+    .select()
+    .from(hooks)
+    .where(eq(hooks.userId, userId))
+    .orderBy(asc(hooks.sizeMm));
+  return rows.map((r) => ({
     id: r.id,
-    sizeUs: r.size_us,
-    sizeMm: r.size_mm == null ? null : Number(r.size_mm),
+    sizeUs: r.sizeUs,
+    sizeMm: r.sizeMm == null ? null : Number(r.sizeMm),
     material: r.material,
     quantity: r.quantity ?? 1,
   }));
 }
 
-export async function getLocations(): Promise<StorageLocation[]> {
-  if (!hasSupabase()) return mockLocations;
-  const supabase = await supabaseServer();
-  const { data, error } = await supabase
-    .from("storage_locations")
-    .select("id,name")
-    .order("name", { ascending: true });
-  if (error) {
-    console.error("[data] getLocations:", error.message);
-    return [];
-  }
-  return data ?? [];
+export async function getNotions(): Promise<Notion[]> {
+  if (!hasDb()) return mockNotions;
+  const userId = await uid();
+  if (!userId) return [];
+  const rows = await db()
+    .select()
+    .from(notions)
+    .where(eq(notions.userId, userId))
+    .orderBy(asc(notions.name));
+  return rows.map((r) => ({ id: r.id, name: r.name, quantity: r.quantity ?? 1 }));
 }
 
-export async function getNotions(): Promise<Notion[]> {
-  if (!hasSupabase()) return mockNotions;
-  const supabase = await supabaseServer();
-  const { data, error } = await supabase
-    .from("notions")
-    .select("id,name,quantity")
-    .order("name", { ascending: true });
-  if (error) {
-    console.error("[data] getNotions:", error.message);
-    return [];
-  }
-  return (data ?? []).map((r) => ({
-    id: r.id,
-    name: r.name,
-    quantity: r.quantity ?? 1,
-  }));
+export async function getLocations(): Promise<StorageLocation[]> {
+  if (!hasDb()) return mockLocations;
+  const userId = await uid();
+  if (!userId) return [];
+  return db()
+    .select({ id: storageLocations.id, name: storageLocations.name })
+    .from(storageLocations)
+    .where(eq(storageLocations.userId, userId))
+    .orderBy(asc(storageLocations.name));
 }
 
 export async function getStats() {

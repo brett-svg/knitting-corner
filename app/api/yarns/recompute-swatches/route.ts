@@ -1,30 +1,23 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { hasSupabase, supabaseServer } from "@/lib/supabase/server";
+import { eq } from "drizzle-orm";
+import { db, schema } from "@/lib/db";
+import { requireUser, serverError } from "@/lib/api";
+import { getObject, hasStorage } from "@/lib/storage";
 import { gradientFromHex, pickSwatch } from "@/lib/swatch";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-async function fetchAsBase64(url: string): Promise<{
-  mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp";
-  data: string;
-} | null> {
+type MediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+const ALLOWED_TYPES = new Set<string>(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+
+async function fetchAsBase64(key: string): Promise<{ mediaType: MediaType; data: string } | null> {
   try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const ct = res.headers.get("content-type") ?? "image/jpeg";
-    const allowed = new Set([
-      "image/jpeg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-    ]);
-    const mediaType = (
-      allowed.has(ct) ? ct : "image/jpeg"
-    ) as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
-    const buf = Buffer.from(await res.arrayBuffer());
-    return { mediaType, data: buf.toString("base64") };
+    const obj = await getObject(key);
+    if (!obj) return null;
+    const mediaType = (ALLOWED_TYPES.has(obj.contentType) ? obj.contentType : "image/jpeg") as MediaType;
+    return { mediaType, data: obj.body.toString("base64") };
   } catch {
     return null;
   }
@@ -33,9 +26,9 @@ async function fetchAsBase64(url: string): Promise<{
 async function hexFromImage(
   anthropic: Anthropic,
   model: string,
-  url: string
+  key: string
 ): Promise<string | null> {
-  const img = await fetchAsBase64(url);
+  const img = await fetchAsBase64(key);
   if (!img) return null;
   try {
     const message = await anthropic.messages.create({
@@ -72,55 +65,40 @@ async function hexFromImage(
 }
 
 export async function POST() {
-  if (!hasSupabase())
-    return NextResponse.json(
-      { error: "Supabase not configured" },
-      { status: 400 }
-    );
-  const supabase = await supabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user)
-    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
-
-  const { data: rows, error } = await supabase
-    .from("yarns")
-    .select("id, colorway, image_url");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const { user, fail } = await requireUser();
+  if (fail) return fail;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const model = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5";
-  const anthropic = apiKey ? new Anthropic({ apiKey }) : null;
+  const anthropic = apiKey && hasStorage() ? new Anthropic({ apiKey }) : null;
 
-  let updated = 0;
-  let viaAi = 0;
-  let viaName = 0;
-  for (const r of rows ?? []) {
-    let swatch: string | null = null;
-    if (anthropic && r.image_url) {
-      const hex = await hexFromImage(anthropic, model, r.image_url);
-      if (hex) {
-        swatch = gradientFromHex(hex);
-        viaAi++;
+  try {
+    const rows = await db()
+      .select({ id: schema.yarns.id, colorway: schema.yarns.colorway, imageKey: schema.yarns.imageKey })
+      .from(schema.yarns)
+      .where(eq(schema.yarns.userId, user.id));
+
+    let updated = 0;
+    let viaAi = 0;
+    let viaName = 0;
+    for (const r of rows) {
+      let swatch: string | null = null;
+      if (anthropic && r.imageKey) {
+        const hex = await hexFromImage(anthropic, model, r.imageKey);
+        if (hex) {
+          swatch = gradientFromHex(hex);
+          viaAi++;
+        }
       }
+      if (!swatch) {
+        swatch = pickSwatch(r.colorway);
+        viaName++;
+      }
+      await db().update(schema.yarns).set({ swatch }).where(eq(schema.yarns.id, r.id));
+      updated++;
     }
-    if (!swatch) {
-      swatch = pickSwatch(r.colorway);
-      viaName++;
-    }
-    const { error: e } = await supabase
-      .from("yarns")
-      .update({ swatch })
-      .eq("id", r.id);
-    if (!e) updated++;
+    return NextResponse.json({ ok: true, updated, total: rows.length, viaAi, viaName });
+  } catch (err) {
+    return serverError(err);
   }
-
-  return NextResponse.json({
-    ok: true,
-    updated,
-    total: rows?.length ?? 0,
-    viaAi,
-    viaName,
-  });
 }

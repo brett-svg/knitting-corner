@@ -1,82 +1,68 @@
 import { NextResponse } from "next/server";
-import { hasSupabase, supabaseServer } from "@/lib/supabase/server";
+import { and, eq } from "drizzle-orm";
+import { db, schema } from "@/lib/db";
+import { requireUser, serverError } from "@/lib/api";
+import { deleteObject } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
-const ALLOWED = new Set([
-  "brand",
-  "product_line",
-  "fiber",
-  "weight_category",
-  "yardage",
-  "meters",
-  "skein_weight_grams",
-  "colorway",
-  "dye_lot",
-  "needle_size",
-  "skeins",
-  "reserved",
-  "storage_location_id",
-  "notes",
-]);
+const { yarns } = schema;
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  if (!hasSupabase())
-    return NextResponse.json({ error: "Supabase not configured" }, { status: 400 });
+// snake_case API field → schema column
+const ALLOWED: Record<string, keyof typeof yarns.$inferInsert> = {
+  brand: "brand",
+  product_line: "productLine",
+  fiber: "fiber",
+  weight_category: "weightCategory",
+  yardage: "yardage",
+  meters: "meters",
+  skein_weight_grams: "skeinWeightGrams",
+  colorway: "colorway",
+  dye_lot: "dyeLot",
+  needle_size: "needleSize",
+  skeins: "skeins",
+  reserved: "reserved",
+  storage_location_id: "storageLocationId",
+  notes: "notes",
+};
 
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { user, fail } = await requireUser();
+  if (fail) return fail;
   const { id } = await params;
-  const supabase = await supabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const body = await req.json();
   const update: Record<string, unknown> = {};
-  for (const k of Object.keys(body)) {
-    if (ALLOWED.has(k)) update[k] = body[k];
+  for (const [k, col] of Object.entries(ALLOWED)) {
+    if (k in body) update[col] = body[k];
   }
   if (Object.keys(update).length === 0)
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
 
-  const { error } = await supabase.from("yarns").update(update).eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  try {
+    await db()
+      .update(yarns)
+      .set(update)
+      .where(and(eq(yarns.id, id), eq(yarns.userId, user.id)));
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return serverError(err);
+  }
 }
 
-export async function DELETE(
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  if (!hasSupabase())
-    return NextResponse.json({ error: "Supabase not configured" }, { status: 400 });
-
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { user, fail } = await requireUser();
+  if (fail) return fail;
   const { id } = await params;
-  const supabase = await supabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
-  // Try to remove the photo too — best-effort.
-  const { data: row } = await supabase
-    .from("yarns")
-    .select("image_url")
-    .eq("id", id)
-    .maybeSingle();
-  if (row?.image_url) {
-    const marker = "/object/public/yarn-photos/";
-    const i = row.image_url.indexOf(marker);
-    if (i >= 0) {
-      const path = row.image_url.slice(i + marker.length);
-      await supabase.storage.from("yarn-photos").remove([path]);
-    }
+  try {
+    const [row] = await db()
+      .delete(yarns)
+      .where(and(eq(yarns.id, id), eq(yarns.userId, user.id)))
+      .returning({ imageKey: yarns.imageKey });
+    if (row?.imageKey) await deleteObject(row.imageKey);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return serverError(err);
   }
-
-  const { error } = await supabase.from("yarns").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
 }

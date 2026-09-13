@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { hasSupabase, supabaseServer } from "@/lib/supabase/server";
+import { and, eq, inArray } from "drizzle-orm";
+import { db, schema } from "@/lib/db";
+import { requireUser, serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -12,17 +14,8 @@ const HEROES = [
 ];
 
 export async function POST(req: Request) {
-  if (!hasSupabase()) {
-    return NextResponse.json(
-      { error: "Supabase not configured" },
-      { status: 400 }
-    );
-  }
-  const supabase = await supabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  const { user, fail } = await requireUser();
+  if (fail) return fail;
 
   const body = await req.json();
   const name = String(body.name ?? "").trim();
@@ -31,44 +24,47 @@ export async function POST(req: Request) {
   const patternId: string | null = body.patternId || null;
   const yarnIds: string[] = Array.isArray(body.yarnIds) ? body.yarnIds : [];
   const status: string = body.status ?? "Planned";
-  const notes: string | null = body.notes || null;
-  const recipient: string | null = body.recipient?.trim() || null;
-  const giftDate: string | null = body.giftDate || null;
 
-  const hero = HEROES[Math.floor(Math.random() * HEROES.length)];
+  try {
+    const id = await db().transaction(async (tx) => {
+      const [proj] = await tx
+        .insert(schema.projects)
+        .values({
+          userId: user.id,
+          name,
+          patternId,
+          status,
+          progress: "0",
+          notes: body.notes || null,
+          hero: HEROES[Math.floor(Math.random() * HEROES.length)],
+          recipient: body.recipient?.trim() || null,
+          giftDate: body.giftDate || null,
+        })
+        .returning({ id: schema.projects.id });
 
-  const { data: proj, error } = await supabase
-    .from("projects")
-    .insert({
-      user_id: user.id,
-      name,
-      pattern_id: patternId,
-      status,
-      progress: 0,
-      notes,
-      hero,
-      recipient,
-      gift_date: giftDate,
-    })
-    .select("id")
-    .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  if (yarnIds.length) {
-    const rows = yarnIds.map((yid) => ({ project_id: proj.id, yarn_id: yid }));
-    const { error: linkErr } = await supabase
-      .from("project_yarns")
-      .insert(rows);
-    if (linkErr) {
-      return NextResponse.json({ error: linkErr.message }, { status: 500 });
-    }
-    if (status === "Active") {
-      await supabase
-        .from("yarns")
-        .update({ reserved: true })
-        .in("id", yarnIds);
-    }
+      if (yarnIds.length) {
+        // Only link yarns the user actually owns.
+        const owned = await tx
+          .select({ id: schema.yarns.id })
+          .from(schema.yarns)
+          .where(and(eq(schema.yarns.userId, user.id), inArray(schema.yarns.id, yarnIds)));
+        const ids = owned.map((y) => y.id);
+        if (ids.length) {
+          await tx
+            .insert(schema.projectYarns)
+            .values(ids.map((yarnId) => ({ projectId: proj.id, yarnId })));
+          if (status === "Active") {
+            await tx
+              .update(schema.yarns)
+              .set({ reserved: true })
+              .where(inArray(schema.yarns.id, ids));
+          }
+        }
+      }
+      return proj.id;
+    });
+    return NextResponse.json({ ok: true, id });
+  } catch (err) {
+    return serverError(err);
   }
-
-  return NextResponse.json({ ok: true, id: proj.id });
 }

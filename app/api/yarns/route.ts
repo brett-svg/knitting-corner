@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { hasSupabase, supabaseServer } from "@/lib/supabase/server";
+import { eq } from "drizzle-orm";
+import { db, schema } from "@/lib/db";
+import { requireUser, serverError } from "@/lib/api";
+import { fileUrl, hasStorage, objectKey, putObject } from "@/lib/storage";
 import { gradientFromHex, pickSwatch } from "@/lib/swatch";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
-
-const BUCKET = "yarn-photos";
 
 // Normalize a brand/colorway/dye-lot string for fuzzy comparison:
 // lowercase, strip punctuation, collapse whitespace, drop common
@@ -63,34 +64,28 @@ export async function POST(req: Request) {
   const skeins = Number(body.skeins ?? 1);
   const images: string[] = Array.isArray(body.images) ? body.images : [];
 
-  if (!hasSupabase()) {
-    return NextResponse.json({
-      ok: true,
-      persisted: false,
-      note: "Supabase not configured — accepted but not stored.",
-    });
-  }
-
-  const supabase = await supabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
-  }
+  const { user, fail } = await requireUser();
+  if (fail) return fail;
 
   // Duplicate detection: same yarn for this user, normalized comparison.
   const force = Boolean(body.force);
   if (!force && label.brand && label.colorway) {
-    const { data: existing } = await supabase
-      .from("yarns")
-      .select(
-        "id, brand, product_line, colorway, dye_lot, skeins, swatch, image_url"
-      )
-      .eq("user_id", user.id);
-    const dupe = (existing ?? []).find((e) =>
+    const existing = await db()
+      .select({
+        id: schema.yarns.id,
+        brand: schema.yarns.brand,
+        productLine: schema.yarns.productLine,
+        colorway: schema.yarns.colorway,
+        dyeLot: schema.yarns.dyeLot,
+        skeins: schema.yarns.skeins,
+        swatch: schema.yarns.swatch,
+        imageKey: schema.yarns.imageKey,
+      })
+      .from(schema.yarns)
+      .where(eq(schema.yarns.userId, user.id));
+    const dupe = existing.find((e) =>
       sameYarn(
-        { brand: e.brand, colorway: e.colorway, dye_lot: e.dye_lot },
+        { brand: e.brand, colorway: e.colorway, dye_lot: e.dyeLot },
         {
           brand: label.brand,
           colorway: label.colorway,
@@ -104,12 +99,12 @@ export async function POST(req: Request) {
           duplicate: {
             id: dupe.id,
             brand: dupe.brand,
-            productLine: dupe.product_line,
+            productLine: dupe.productLine,
             colorway: dupe.colorway,
-            dyeLot: dupe.dye_lot,
+            dyeLot: dupe.dyeLot,
             skeins: dupe.skeins,
             swatch: dupe.swatch,
-            imageUrl: dupe.image_url,
+            imageUrl: fileUrl(dupe.imageKey),
           },
           incomingSkeins: skeins,
         },
@@ -118,58 +113,52 @@ export async function POST(req: Request) {
     }
   }
 
-  // Upload first image (if any) — others can be wired later for back/side shots.
-  let imageUrl: string | null = null;
+  // Upload the first image (if any). Skipped silently when no bucket is wired.
+  let imageKey: string | null = null;
   const first = images[0];
-  if (first?.startsWith("data:image/")) {
+  if (hasStorage() && first?.startsWith("data:image/")) {
     const decoded = decodeDataUrl(first);
     if (decoded) {
-      const path = `${user.id}/${crypto.randomUUID()}.${decoded.ext}`;
-      const up = await supabase.storage
-        .from(BUCKET)
-        .upload(path, decoded.bytes, {
-          contentType: decoded.contentType,
-          upsert: false,
-        });
-      if (up.error) {
+      imageKey = objectKey("yarn-photos", user.id, decoded.ext);
+      try {
+        await putObject(imageKey, decoded.bytes, decoded.contentType);
+      } catch (err) {
         return NextResponse.json(
-          { error: `Upload failed: ${up.error.message}` },
+          { error: `Upload failed: ${err instanceof Error ? err.message : "unknown"}` },
           { status: 500 }
         );
       }
-      const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      imageUrl = pub.publicUrl;
     }
   }
 
   const swatch =
     gradientFromHex(label.swatch_hex ?? "") || pickSwatch(label.colorway);
 
-  const { data, error } = await supabase
-    .from("yarns")
-    .insert({
-      user_id: user.id,
-      brand: label.brand,
-      product_line: label.product_line,
-      fiber: label.fiber,
-      weight_category: label.weight_category,
-      yardage: label.yardage,
-      meters: label.meters,
-      skein_weight_grams: label.skein_weight_grams,
-      colorway: label.colorway,
-      dye_lot: label.dye_lot,
-      needle_size: label.needle_size,
-      skeins,
-      swatch,
-      image_url: imageUrl,
-      storage_location_id: body.locationId || null,
-      notes: typeof body.notes === "string" && body.notes.trim() ? body.notes.trim() : null,
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  try {
+    const [row] = await db()
+      .insert(schema.yarns)
+      .values({
+        userId: user.id,
+        brand: label.brand,
+        productLine: label.product_line,
+        fiber: label.fiber,
+        weightCategory: label.weight_category,
+        yardage: label.yardage,
+        meters: label.meters,
+        skeinWeightGrams: label.skein_weight_grams,
+        colorway: label.colorway,
+        dyeLot: label.dye_lot,
+        needleSize: label.needle_size,
+        skeins,
+        swatch,
+        imageKey,
+        storageLocationId: body.locationId || null,
+        notes: typeof body.notes === "string" && body.notes.trim() ? body.notes.trim() : null,
+        ravelryYarnId: Number.isInteger(body.ravelryYarnId) ? body.ravelryYarnId : null,
+      })
+      .returning({ id: schema.yarns.id });
+    return NextResponse.json({ ok: true, persisted: true, id: row.id, imageUrl: fileUrl(imageKey) });
+  } catch (err) {
+    return serverError(err);
   }
-  return NextResponse.json({ ok: true, persisted: true, id: data.id, imageUrl });
 }

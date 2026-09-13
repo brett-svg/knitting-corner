@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { hasSupabase, supabaseServer } from "@/lib/supabase/server";
+import { db, schema } from "@/lib/db";
+import { requireUser, serverError } from "@/lib/api";
+import { hasStorage, objectKey, putObject } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-const PDF_BUCKET = "pattern-pdfs";
-const COVER_BUCKET = "pattern-covers";
 
 async function renderFirstPage(pdf: Buffer): Promise<Buffer | null> {
   try {
@@ -21,18 +20,8 @@ async function renderFirstPage(pdf: Buffer): Promise<Buffer | null> {
 }
 
 export async function POST(req: Request) {
-  if (!hasSupabase()) {
-    return NextResponse.json(
-      { error: "Supabase not configured" },
-      { status: 400 }
-    );
-  }
-
-  const supabase = await supabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  const { user, fail } = await requireUser();
+  if (fail) return fail;
 
   const fd = await req.formData();
   const name = String(fd.get("name") ?? "").trim();
@@ -51,11 +40,14 @@ export async function POST(req: Request) {
   const garment_type = strOrNull(fd.get("garment_type"));
   const recommended_yarn = strOrNull(fd.get("recommended_yarn"));
 
-  let pdf_path: string | null = null;
-  let cover_url: string | null = null;
+  let pdfKey: string | null = null;
+  let coverKey: string | null = null;
 
   const pdf = fd.get("pdf");
   if (pdf instanceof File && pdf.size > 0) {
+    if (!hasStorage()) {
+      return NextResponse.json({ error: "File storage isn't configured" }, { status: 400 });
+    }
     if (pdf.type !== "application/pdf") {
       return NextResponse.json({ error: "PDF must be application/pdf" }, { status: 400 });
     }
@@ -64,13 +56,12 @@ export async function POST(req: Request) {
     }
     const buf = Buffer.from(await pdf.arrayBuffer());
 
-    pdf_path = `${user.id}/${crypto.randomUUID()}.pdf`;
-    const upPdf = await supabase.storage
-      .from(PDF_BUCKET)
-      .upload(pdf_path, buf, { contentType: "application/pdf", upsert: false });
-    if (upPdf.error) {
+    pdfKey = objectKey("pattern-pdfs", user.id, "pdf");
+    try {
+      await putObject(pdfKey, buf, "application/pdf");
+    } catch (err) {
       return NextResponse.json(
-        { error: `PDF upload failed: ${upPdf.error.message}` },
+        { error: `PDF upload failed: ${err instanceof Error ? err.message : "unknown"}` },
         { status: 500 }
       );
     }
@@ -91,47 +82,43 @@ export async function POST(req: Request) {
       }
     }
     if (coverBytes) {
-      const ext = coverContentType.split("/")[1] || "jpg";
-      const coverPath = `${user.id}/${crypto.randomUUID()}.${ext}`;
-      const upCover = await supabase.storage
-        .from(COVER_BUCKET)
-        .upload(coverPath, coverBytes, {
-          contentType: coverContentType,
-          upsert: false,
-        });
-      if (!upCover.error) {
-        cover_url = supabase.storage
-          .from(COVER_BUCKET)
-          .getPublicUrl(coverPath).data.publicUrl;
+      const ext = (coverContentType.split("/")[1] || "jpg").replace("jpeg", "jpg");
+      const key = objectKey("pattern-covers", user.id, ext);
+      try {
+        await putObject(key, coverBytes, coverContentType);
+        coverKey = key;
+      } catch (err) {
+        console.warn("[patterns] cover upload failed:", err);
       }
     }
   }
 
-  const { data, error } = await supabase
-    .from("patterns")
-    .insert({
-      user_id: user.id,
-      name,
-      designer,
-      external_url,
-      pdf_path,
-      cover_url,
-      yarn_weight,
-      required_yardage: yardage,
-      needle_size,
-      notes,
-      gauge,
-      sizes,
-      construction,
-      techniques,
-      garment_type,
-      recommended_yarn,
-    })
-    .select("id")
-    .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  return NextResponse.json({ ok: true, id: data.id });
+  try {
+    const [row] = await db()
+      .insert(schema.patterns)
+      .values({
+        userId: user.id,
+        name,
+        designer,
+        externalUrl: external_url,
+        pdfKey,
+        coverKey,
+        yarnWeight: yarn_weight,
+        requiredYardage: yardage,
+        needleSize: needle_size,
+        notes,
+        gauge,
+        sizes,
+        construction,
+        techniques,
+        garmentType: garment_type,
+        recommendedYarn: recommended_yarn,
+      })
+      .returning({ id: schema.patterns.id });
+    return NextResponse.json({ ok: true, id: row.id });
+  } catch (err) {
+    return serverError(err);
+  }
 }
 
 function strOrNull(v: FormDataEntryValue | null) {

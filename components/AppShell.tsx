@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getUser } from "@/lib/supabase/server";
+import { getUser } from "@/lib/auth";
 import { NavLinks } from "@/components/NavLinks";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {

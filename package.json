@@ -5,22 +5,29 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "start": "npm run db:migrate && next start",
+    "lint": "next lint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.94.0",
-    "@supabase/ssr": "^0.10.2",
-    "@supabase/supabase-js": "^2.105.3",
+    "@aws-sdk/client-s3": "^3.1131.0",
+    "@aws-sdk/s3-request-presigner": "^3.1131.0",
     "clsx": "^2.1.1",
+    "drizzle-kit": "^0.31.10",
+    "drizzle-orm": "^0.45.2",
+    "jose": "^6.2.12",
     "next": "^16.2.4",
-    "openai": "^6.36.0",
     "pdf-to-img": "^6.0.0",
+    "pg": "^8.23.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   },
   "devDependencies": {
     "@types/node": "^22",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.20",

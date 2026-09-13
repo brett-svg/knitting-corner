@@ -1,51 +1,42 @@
 import { NextResponse } from "next/server";
-import { hasSupabase, supabaseServer } from "@/lib/supabase/server";
+import { and, eq } from "drizzle-orm";
+import { db, schema } from "@/lib/db";
+import { requireUser, serverError } from "@/lib/api";
 
 export const runtime = "nodejs";
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  if (!hasSupabase())
-    return NextResponse.json({ error: "Supabase not configured" }, { status: 400 });
+const { storageLocations } = schema;
+
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { user, fail } = await requireUser();
+  if (fail) return fail;
   const { id } = await params;
-  const supabase = await supabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const { name } = await req.json();
   const trimmed = String(name ?? "").trim();
-  if (!trimmed)
-    return NextResponse.json({ error: "Name required" }, { status: 400 });
+  if (!trimmed) return NextResponse.json({ error: "Name required" }, { status: 400 });
 
-  const { error } = await supabase
-    .from("storage_locations")
-    .update({ name: trimmed })
-    .eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  try {
+    await db()
+      .update(storageLocations)
+      .set({ name: trimmed })
+      .where(and(eq(storageLocations.id, id), eq(storageLocations.userId, user.id)));
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return serverError(err);
+  }
 }
 
-export async function DELETE(
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  if (!hasSupabase())
-    return NextResponse.json({ error: "Supabase not configured" }, { status: 400 });
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { user, fail } = await requireUser();
+  if (fail) return fail;
   const { id } = await params;
-  const supabase = await supabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
-
-  const { error } = await supabase
-    .from("storage_locations")
-    .delete()
-    .eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  try {
+    await db()
+      .delete(storageLocations)
+      .where(and(eq(storageLocations.id, id), eq(storageLocations.userId, user.id)));
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return serverError(err);
+  }
 }

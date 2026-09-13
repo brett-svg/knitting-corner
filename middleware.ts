@@ -1,37 +1,22 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { COOKIE_NAME, verifySession } from "@/lib/auth-edge";
 
-const PUBLIC_PATHS = [/^\/login/, /^\/auth\//];
+const PUBLIC_PATHS = [/^\/login/, /^\/api\/auth\//];
 
 export async function middleware(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // No database configured? Run in demo mode — let everything through.
+  if (!process.env.DATABASE_URL) return NextResponse.next();
 
-  // No Supabase configured? Run in demo mode — let everything through.
-  if (!url || !key) return NextResponse.next();
-
-  let response = NextResponse.next({ request });
-
-  const supabase = createServerClient(url, key, {
-    cookies: {
-      getAll: () => request.cookies.getAll(),
-      setAll: (toSet) => {
-        toSet.forEach(({ name, value, options }) => {
-          request.cookies.set(name, value);
-          response.cookies.set(name, value, options as CookieOptions);
-        });
-      },
-    },
-  });
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const token = request.cookies.get(COOKIE_NAME)?.value;
+  const user = token ? await verifySession(token) : null;
 
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((re) => re.test(path));
 
   if (!user && !isPublic) {
+    if (path.startsWith("/api/")) {
+      return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+    }
     const redirect = new URL("/login", request.url);
     redirect.searchParams.set("next", path);
     return NextResponse.redirect(redirect);
@@ -39,8 +24,7 @@ export async function middleware(request: NextRequest) {
   if (user && path === "/login") {
     return NextResponse.redirect(new URL("/", request.url));
   }
-
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {
