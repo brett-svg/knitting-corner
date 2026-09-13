@@ -7,7 +7,7 @@ import { fileUrl, getObject, hasStorage, objectKey, putObject } from "@/lib/stor
 import { decodeDataUrl, extractLabel, type ImageInput } from "@/lib/scan-label";
 import { sameYarn } from "@/lib/dedupe";
 import { gradientFromHex, pickSwatch } from "@/lib/swatch";
-import type { RavelryMatch, YarnLabel } from "@/lib/yarn-label";
+import { roundLabel, type RavelryMatch, type YarnLabel } from "@/lib/yarn-label";
 
 const { scanSessions, scanItems, yarns, storageLocations } = schema;
 
@@ -117,8 +117,8 @@ export async function runExtraction(itemId: string, userId: string): Promise<voi
       .update(scanItems)
       .set({
         status: "extracted",
-        label: result.label,
-        raw: result.raw,
+        label: roundLabel(result.label),
+        raw: roundLabel(result.raw),
         ravelry: {
           yarn: result.ravelry.yarn
             ? {
@@ -336,7 +336,7 @@ export async function commitSession(
 
   await db().transaction(async (tx) => {
     for (const it of items) {
-      const label = it.label;
+      const label = it.label ? roundLabel(it.label) : null;
       if (!label) {
         skipped++;
         continue;

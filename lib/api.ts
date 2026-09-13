@@ -12,11 +12,15 @@ export const unauthorized = () =>
 
 export const notFound = () => NextResponse.json({ error: "Not found" }, { status: 404 });
 
-export const serverError = (err: unknown) =>
-  NextResponse.json(
-    { error: err instanceof Error ? err.message : "Something went wrong" },
-    { status: 500 }
-  );
+export function serverError(err: unknown) {
+  console.error("[api]", err);
+  let message = err instanceof Error ? err.message : "Something went wrong";
+  // Drizzle wraps pg errors as "Failed query: <sql> params: <...>"; the
+  // useful part is the cause.
+  const cause = err instanceof Error ? (err.cause as { message?: string } | undefined) : undefined;
+  if (message.startsWith("Failed query") && cause?.message) message = `Database error: ${cause.message}`;
+  return NextResponse.json({ error: message }, { status: 500 });
+}
 
 // Returns the user, or the response to send instead.
 export async function requireUser(): Promise<

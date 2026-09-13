@@ -3,7 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { notFound, requireUser, serverError } from "@/lib/api";
 import { runExtraction, storeImages, touchSession } from "@/lib/sessions";
-import type { YarnLabel } from "@/lib/yarn-label";
+import { roundLabel, type YarnLabel } from "@/lib/yarn-label";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -57,7 +57,7 @@ export async function PATCH(req: Request, { params }: Params) {
       for (const k of LABEL_KEYS) {
         if (k in body.label) (merged as Record<string, unknown>)[k] = body.label[k] ?? null;
       }
-      update.label = merged;
+      update.label = roundLabel(merged);
     }
     if (typeof body.skeins === "number") update.skeins = Math.max(1, Math.round(body.skeins));
     if (typeof body.incrementSkeins === "number")

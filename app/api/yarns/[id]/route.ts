@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { requireUser, serverError } from "@/lib/api";
 import { deleteObject } from "@/lib/storage";
+import { roundLabel } from "@/lib/yarn-label";
 
 export const runtime = "nodejs";
 
@@ -31,7 +32,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (fail) return fail;
   const { id } = await params;
 
-  const body = await req.json();
+  const body = roundLabel(await req.json());
   const update: Record<string, unknown> = {};
   for (const [k, col] of Object.entries(ALLOWED)) {
     if (k in body) update[col] = body[k];

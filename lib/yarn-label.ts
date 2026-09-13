@@ -61,3 +61,16 @@ export function applyRavelry(
   set("skein_weight_grams", y.grams);
   return { label: out, overrides };
 }
+
+// Numeric label fields are stored as integers; the model happily returns 99.7.
+export function roundLabel<T extends Partial<YarnLabel>>(label: T): T {
+  const out = { ...label };
+  for (const k of ["yardage", "meters", "skein_weight_grams"] as const) {
+    if (k in out) {
+      const v = out[k];
+      (out as Record<string, unknown>)[k] =
+        v == null || v === ("" as unknown) || !Number.isFinite(Number(v)) ? null : Math.round(Number(v));
+    }
+  }
+  return out;
+}

@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { requireUser, serverError } from "@/lib/api";
-import { fileUrl, hasStorage, objectKey, putObject } from "@/lib/storage";
+import { deleteObject, fileUrl, hasStorage, objectKey, putObject } from "@/lib/storage";
 import { gradientFromHex, pickSwatch } from "@/lib/swatch";
 import { sameYarn } from "@/lib/dedupe";
+import { roundLabel } from "@/lib/yarn-label";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -21,7 +22,7 @@ function decodeDataUrl(dataUrl: string) {
 
 export async function POST(req: Request) {
   const body = await req.json();
-  const label = body.label ?? {};
+  const label = roundLabel(body.label ?? {});
   const skeins = Number(body.skeins ?? 1);
   const images: string[] = Array.isArray(body.images) ? body.images : [];
 
@@ -120,6 +121,8 @@ export async function POST(req: Request) {
       .returning({ id: schema.yarns.id });
     return NextResponse.json({ ok: true, persisted: true, id: row.id, imageUrl: fileUrl(imageKey) });
   } catch (err) {
+    // Don't leave the photo orphaned in the bucket.
+    if (imageKey) await deleteObject(imageKey);
     return serverError(err);
   }
 }

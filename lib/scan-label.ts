@@ -3,6 +3,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { resolveWithRavelry, type RavelryMatch, type YarnLabel } from "@/lib/resolve-yarn";
+import { roundLabel } from "@/lib/yarn-label";
 
 export type ImageInput = { mediaType: ImageMediaType; data: string }; // base64
 export type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
@@ -122,7 +123,7 @@ export async function extractLabel(images: ImageInput[]): Promise<Extraction> {
   if (!block || block.type !== "tool_use") {
     throw new Error("Model did not return structured output");
   }
-  const raw = block.input as YarnLabel;
+  const raw = roundLabel(block.input as YarnLabel);
   const resolved = await resolveWithRavelry(raw, { anthropic, model });
   return { ...resolved, raw, mocked: false };
 }
