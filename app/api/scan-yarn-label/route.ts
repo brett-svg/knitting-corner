@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { resolveWithRavelry, type YarnLabel } from "@/lib/resolve-yarn";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -7,20 +8,6 @@ export const maxDuration = 30;
 type ScanRequest = {
   // data URLs (data:image/jpeg;base64,...)
   images: string[];
-};
-
-type YarnLabel = {
-  brand: string | null;
-  product_line: string | null;
-  fiber: string | null;
-  weight_category: string | null;
-  yardage: number | null;
-  meters: number | null;
-  skein_weight_grams: number | null;
-  colorway: string | null;
-  dye_lot: string | null;
-  needle_size: string | null;
-  swatch_hex: string | null;
 };
 
 const TOOL = {
@@ -115,7 +102,9 @@ export async function POST(req: Request) {
       needle_size: "US 7 (4.5mm)",
       swatch_hex: "#7E2D5F",
     };
-    return NextResponse.json({ label: mock, mocked: true });
+    // Still run the Ravelry pass if creds exist, so the flow can be tested.
+    const resolved = await resolveWithRavelry(mock);
+    return NextResponse.json({ ...resolved, raw: mock, mocked: true });
   }
 
   const decoded = body.images.map(decodeDataUrl).filter(Boolean) as Array<{
@@ -171,7 +160,9 @@ export async function POST(req: Request) {
         { status: 502 }
       );
     }
-    return NextResponse.json({ label: block.input as YarnLabel, mocked: false });
+    const raw = block.input as YarnLabel;
+    const resolved = await resolveWithRavelry(raw, { anthropic, model });
+    return NextResponse.json({ ...resolved, raw, mocked: false });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "scan failed";
     return NextResponse.json({ error: msg }, { status: 500 });

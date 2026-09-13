@@ -7,19 +7,12 @@ import clsx from "clsx";
 import type { Pattern, StorageLocation } from "@/lib/mock";
 import { SkeinStepper } from "@/components/SkeinStepper";
 import { PatternCard } from "@/components/PatternCard";
-
-type Label = {
-  brand: string | null;
-  product_line: string | null;
-  fiber: string | null;
-  weight_category: string | null;
-  yardage: number | null;
-  meters: number | null;
-  skein_weight_grams: number | null;
-  colorway: string | null;
-  dye_lot: string | null;
-  needle_size: string | null;
-};
+import {
+  applyRavelry,
+  type RavelryMatch,
+  type RavelryYarn,
+  type YarnLabel as Label,
+} from "@/lib/yarn-label";
 
 type Phase = "capture" | "processing" | "review" | "saved";
 
@@ -46,6 +39,8 @@ export function ScanClient({
   const [phase, setPhase] = useState<Phase>("capture");
   const [images, setImages] = useState<string[]>([]);
   const [label, setLabel] = useState<Label | null>(null);
+  const [rawLabel, setRawLabel] = useState<Label | null>(null);
+  const [ravelry, setRavelry] = useState<RavelryMatch | null>(null);
   const [mocked, setMocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,8 +86,15 @@ export function ScanClient({
         body: JSON.stringify({ images }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Scan failed");
-      const json = (await res.json()) as { label: Label; mocked: boolean };
+      const json = (await res.json()) as {
+        label: Label;
+        raw?: Label;
+        ravelry?: RavelryMatch;
+        mocked: boolean;
+      };
       setLabel(json.label);
+      setRawLabel(json.raw ?? json.label);
+      setRavelry(json.ravelry ?? null);
       setMocked(json.mocked);
       setPhase("review");
     } catch (e) {
@@ -104,6 +106,8 @@ export function ScanClient({
   function reset(resetDefaults = false) {
     setImages([]);
     setLabel(null);
+    setRawLabel(null);
+    setRavelry(null);
     setError(null);
     setPhase("capture");
     if (resetDefaults) {
@@ -222,6 +226,8 @@ export function ScanClient({
       {phase === "review" && label && (
         <Review
           label={label}
+          rawLabel={rawLabel ?? label}
+          ravelry={ravelry}
           images={images}
           mocked={mocked}
           locations={locations}
@@ -252,6 +258,8 @@ export function ScanClient({
 
 function Review({
   label,
+  rawLabel,
+  ravelry,
   images,
   mocked,
   locations,
@@ -261,6 +269,8 @@ function Review({
   onSaved,
 }: {
   label: Label;
+  rawLabel: Label;
+  ravelry: RavelryMatch | null;
   images: string[];
   mocked: boolean;
   locations: StorageLocation[];
@@ -270,6 +280,9 @@ function Review({
   onSaved: (skeins: number, label: Label, location: string) => void;
 }) {
   const [form, setForm] = useState(label);
+  const [match, setMatch] = useState<RavelryYarn | null>(ravelry?.yarn ?? null);
+  const [overrides, setOverrides] = useState<(keyof Label)[]>(ravelry?.overrides ?? []);
+  const [showCandidates, setShowCandidates] = useState(false);
   const [skeins, setSkeins] = useState(defaultSkeins);
   const [locationId, setLocationId] = useState<string>(defaultLocation);
   const [notes, setNotes] = useState<string>("");
@@ -279,6 +292,27 @@ function Review({
 
   function update<K extends keyof Label>(k: K, v: Label[K]) {
     setForm((f) => ({ ...f, [k]: v }));
+    // Once you hand-edit a Ravelry-filled field it's yours, not Ravelry's.
+    setOverrides((o) => o.filter((x) => x !== k));
+  }
+
+  function pickCandidate(y: RavelryYarn) {
+    // Re-apply from the raw label so a previous candidate's values don't bleed through.
+    const applied = applyRavelry(
+      { ...rawLabel, colorway: form.colorway, dye_lot: form.dye_lot, needle_size: form.needle_size },
+      y
+    );
+    setForm(applied.label);
+    setOverrides(applied.overrides);
+    setMatch(y);
+    setShowCandidates(false);
+  }
+
+  function useLabelValues() {
+    setForm({ ...rawLabel, colorway: form.colorway, dye_lot: form.dye_lot, needle_size: form.needle_size });
+    setOverrides([]);
+    setMatch(null);
+    setShowCandidates(false);
   }
 
   async function save(force = false) {
@@ -294,6 +328,7 @@ function Review({
           images,
           locationId: locationId || null,
           notes: notes || null,
+          ravelryYarnId: match?.id ?? null,
           force,
         }),
       });
@@ -343,6 +378,19 @@ function Review({
         </p>
       )}
 
+      {ravelry && (
+        <RavelryBanner
+          match={match}
+          matchedBy={ravelry.matchedBy}
+          candidates={ravelry.candidates}
+          overrides={overrides}
+          showCandidates={showCandidates}
+          onToggleCandidates={() => setShowCandidates((v) => !v)}
+          onPick={pickCandidate}
+          onClear={useLabelValues}
+        />
+      )}
+
       {duplicate && (
         <div className="card grad-border space-y-4 p-5">
           <div>
@@ -387,27 +435,29 @@ function Review({
 
       <div className="card space-y-5 p-6">
         <Row>
-          <Field label="Brand" value={form.brand ?? ""} onChange={(v) => update("brand", v)} />
-          <Field label="Product line" value={form.product_line ?? ""} onChange={(v) => update("product_line", v)} />
+          <Field label="Brand" value={form.brand ?? ""} onChange={(v) => update("brand", v)} fromRavelry={overrides.includes("brand")} />
+          <Field label="Product line" value={form.product_line ?? ""} onChange={(v) => update("product_line", v)} fromRavelry={overrides.includes("product_line")} />
         </Row>
         <Row>
           <Field label="Colorway" value={form.colorway ?? ""} onChange={(v) => update("colorway", v)} />
           <Field label="Dye lot" value={form.dye_lot ?? ""} onChange={(v) => update("dye_lot", v)} />
         </Row>
         <Row>
-          <Field label="Weight" value={form.weight_category ?? ""} onChange={(v) => update("weight_category", v)} />
-          <Field label="Fiber" value={form.fiber ?? ""} onChange={(v) => update("fiber", v)} />
+          <Field label="Weight" value={form.weight_category ?? ""} onChange={(v) => update("weight_category", v)} fromRavelry={overrides.includes("weight_category")} />
+          <Field label="Fiber" value={form.fiber ?? ""} onChange={(v) => update("fiber", v)} fromRavelry={overrides.includes("fiber")} />
         </Row>
         <Row>
           <Field
             label="Yardage / skein"
             type="number"
+            fromRavelry={overrides.includes("yardage")}
             value={form.yardage?.toString() ?? ""}
             onChange={(v) => update("yardage", v ? Number(v) : null)}
           />
           <Field
             label="Meters / skein"
             type="number"
+            fromRavelry={overrides.includes("meters")}
             value={form.meters?.toString() ?? ""}
             onChange={(v) => update("meters", v ? Number(v) : null)}
           />
@@ -416,6 +466,7 @@ function Review({
           <Field
             label="Skein weight (g)"
             type="number"
+            fromRavelry={overrides.includes("skein_weight_grams")}
             value={form.skein_weight_grams?.toString() ?? ""}
             onChange={(v) => update("skein_weight_grams", v ? Number(v) : null)}
           />
@@ -524,6 +575,101 @@ function Saved({
   );
 }
 
+function RavelryBanner({
+  match,
+  matchedBy,
+  candidates,
+  overrides,
+  showCandidates,
+  onToggleCandidates,
+  onPick,
+  onClear,
+}: {
+  match: RavelryYarn | null;
+  matchedBy: RavelryMatch["matchedBy"];
+  candidates: RavelryYarn[];
+  overrides: (keyof Label)[];
+  showCandidates: boolean;
+  onToggleCandidates: () => void;
+  onPick: (y: RavelryYarn) => void;
+  onClear: () => void;
+}) {
+  const others = candidates.filter((c) => c.id !== match?.id);
+  if (!match && candidates.length === 0) return null;
+
+  return (
+    <div className="card space-y-3 p-4">
+      {match ? (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-[0.18em] text-muted">
+              Matched on Ravelry{matchedBy === "ai" ? " · AI-assisted" : ""}
+            </p>
+            <p className="mt-0.5 truncate font-display text-xl">
+              {match.company} · <span className="italic">{match.name}</span>
+            </p>
+            <p className="mt-0.5 text-xs text-muted">
+              {overrides.length
+                ? "Fiber, yardage and weight filled from Ravelry's listing."
+                : "Label already matched Ravelry's listing."}{" "}
+              <a
+                href={match.url}
+                target="_blank"
+                rel="noreferrer"
+                className="underline hover:text-ink"
+              >
+                View on Ravelry ↗
+              </a>
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-3 text-xs">
+            {others.length > 0 && (
+              <button type="button" onClick={onToggleCandidates} className="underline hover:text-ink">
+                Not this yarn?
+              </button>
+            )}
+            <button type="button" onClick={onClear} className="text-muted underline hover:text-ink">
+              Use label values
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-muted">
+            Ravelry · no confident match
+          </p>
+          <p className="mt-0.5 text-sm text-muted">
+            Pick one to fill fiber, yardage and weight from its listing, or keep the label values.
+          </p>
+        </div>
+      )}
+
+      {(showCandidates || !match) && others.length > 0 && (
+        <ul className="divide-y divide-border rounded-xl border border-border">
+          {others.map((c) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                onClick={() => onPick(c)}
+                className="flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left text-sm transition hover:bg-tint/60"
+              >
+                <span className="min-w-0 truncate">
+                  <span className="font-medium">{c.company}</span> · {c.name}
+                </span>
+                <span className="shrink-0 text-xs text-muted">
+                  {[c.weightName, c.yardage && `${c.yardage} yd`, c.grams && `${c.grams} g`]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function Row({ children }: { children: React.ReactNode }) {
   return <div className="grid items-end gap-4 md:grid-cols-2">{children}</div>;
 }
@@ -533,16 +679,26 @@ function Field({
   value,
   onChange,
   type = "text",
+  fromRavelry = false,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   type?: string;
+  fromRavelry?: boolean;
 }) {
   return (
     <label className="block text-sm">
-      <span className="text-xs font-medium uppercase tracking-wider text-muted">
+      <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted">
         {label}
+        {fromRavelry && (
+          <span
+            title="Filled from Ravelry"
+            className="rounded-full bg-accent-violet/15 px-1.5 py-px text-[9px] tracking-normal text-accent-violet"
+          >
+            Ravelry
+          </span>
+        )}
       </span>
       <input
         type={type}
