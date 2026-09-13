@@ -6,6 +6,7 @@ import {
   boolean,
   date,
   integer,
+  jsonb,
   numeric,
   pgTable,
   primaryKey,
@@ -173,3 +174,64 @@ export const tags = pgTable(
   },
   (t) => [unique().on(t.userId, t.name)]
 );
+
+// ── Inventory sessions ────────────────────────────────────────────────────
+// A counting session: capture on the phone, review + commit on the laptop.
+// Nothing touches `yarns` until commit.
+
+export const scanSessions = pgTable("scan_sessions", {
+  id: id(),
+  userId: userId(),
+  name: text("name").notNull(),
+  defaultLocationId: uuid("default_location_id").references(() => storageLocations.id, {
+    onDelete: "set null",
+  }),
+  status: text("status").notNull().default("open"), // open | committed
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const scanItems = pgTable("scan_items", {
+  id: id(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => scanSessions.id, { onDelete: "cascade" }),
+  userId: userId(),
+  seq: integer("seq").notNull(), // capture order within the session
+  imageKeys: jsonb("image_keys").$type<string[]>().notNull().default([]),
+  label: jsonb("label").$type<YarnLabelJson | null>(),
+  raw: jsonb("raw").$type<YarnLabelJson | null>(),
+  ravelry: jsonb("ravelry").$type<RavelryMatchJson | null>(),
+  skeins: integer("skeins").notNull().default(1),
+  // captured | extracting | extracted | failed | accepted | discarded | committed
+  status: text("status").notNull().default("captured"),
+  matchedYarnId: uuid("matched_yarn_id").references(() => yarns.id, { onDelete: "set null" }),
+  mergeIntoMatch: boolean("merge_into_match").notNull().default(true),
+  locationId: uuid("location_id").references(() => storageLocations.id, { onDelete: "set null" }),
+  notes: text("notes"),
+  error: text("error"),
+  committedYarnId: uuid("committed_yarn_id").references(() => yarns.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Structural copies of the lib/yarn-label types so the schema stays dependency-free.
+type YarnLabelJson = {
+  brand: string | null;
+  product_line: string | null;
+  fiber: string | null;
+  weight_category: string | null;
+  yardage: number | null;
+  meters: number | null;
+  skein_weight_grams: number | null;
+  colorway: string | null;
+  dye_lot: string | null;
+  needle_size: string | null;
+  swatch_hex: string | null;
+};
+type RavelryMatchJson = {
+  yarn: { id: number; name: string; company: string; url: string } | null;
+  matchedBy: "auto" | "ai" | "none";
+  candidates: unknown[];
+  overrides: string[];
+};

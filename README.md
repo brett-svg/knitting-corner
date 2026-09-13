@@ -74,3 +74,4 @@ Edit `lib/db/schema.ts`, run `npm run db:generate` to write a migration into `dr
 - ✅ Storage locations CRUD (Tools → Locations) wired into the yarn editor and detail page
 - ✅ "What can I make?" — yarn detail page surfaces compatible patterns
 - ✅ Mobile pass: tighter 5-tab bottom nav, iOS safe-area, focus rings, scrollable filter rows
+- ✅ Counting sessions (Stash → "Count a batch"): snap every skein on the phone with no typing — photos upload and are read in the background; "Same as last +1" for repeats; "+ back of band" re-reads with both photos. Review the batch on any screen as a live-updating table (inline edits, Enter to accept, Ravelry tags, merge-into-existing suggestions), then commit everything to the stash in one transaction.
