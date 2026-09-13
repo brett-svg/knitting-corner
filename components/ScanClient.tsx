@@ -613,7 +613,7 @@ function RavelryBanner({
             <p className="text-xs uppercase tracking-[0.18em] text-muted">
               Matched on Ravelry{matchedBy === "ai" ? " · AI-assisted" : ""}
             </p>
-            <p className="mt-0.5 truncate font-display text-xl">
+            <p className="mt-0.5 break-words font-display text-xl">
               {match.company} · <span className="italic">{match.name}</span>
             </p>
             <p className="mt-0.5 text-xs text-muted">
@@ -630,7 +630,7 @@ function RavelryBanner({
               </a>
             </p>
           </div>
-          <div className="flex shrink-0 gap-3 text-xs">
+          <div className="flex w-full gap-4 text-xs sm:w-auto sm:shrink-0">
             {others.length > 0 && (
               <button type="button" onClick={onToggleCandidates} className="underline hover:text-ink">
                 Not this yarn?
@@ -659,9 +659,9 @@ function RavelryBanner({
               <button
                 type="button"
                 onClick={() => onPick(c)}
-                className="flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left text-sm transition hover:bg-tint/60"
+                className="flex w-full flex-col gap-0.5 px-3.5 py-2.5 text-left text-sm transition hover:bg-tint/60 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
               >
-                <span className="min-w-0 truncate">
+                <span className="min-w-0 break-words">
                   <span className="font-medium">{c.company}</span> · {c.name}
                 </span>
                 <span className="shrink-0 text-xs text-muted">
