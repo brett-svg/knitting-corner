@@ -323,6 +323,77 @@ export async function getLocations(): Promise<StorageLocation[]> {
     .orderBy(asc(storageLocations.name));
 }
 
+export type LocationWithYarns = {
+  id: string;
+  name: string;
+  yarns: Array<{
+    brand: string;
+    productLine: string;
+    colorway: string;
+    weight: string;
+    skeins: number;
+  }>;
+};
+
+export async function getLocationsWithYarns(): Promise<LocationWithYarns[]> {
+  if (!hasDb()) {
+    return mockLocations.map((loc) => ({
+      ...loc,
+      yarns: mockYarns
+        .filter((y) => y.locationId === loc.id)
+        .map((y) => ({
+          brand: y.brand,
+          productLine: y.productLine ?? "",
+          colorway: y.colorway,
+          weight: y.weight,
+          skeins: y.skeins,
+        })),
+    }));
+  }
+  const userId = await uid();
+  if (!userId) return [];
+
+  const locs = await db()
+    .select({ id: storageLocations.id, name: storageLocations.name })
+    .from(storageLocations)
+    .where(eq(storageLocations.userId, userId))
+    .orderBy(asc(storageLocations.name));
+
+  if (!locs.length) return [];
+
+  const yarnRows = await db()
+    .select({
+      id: yarns.id,
+      brand: yarns.brand,
+      productLine: yarns.productLine,
+      colorway: yarns.colorway,
+      weightCategory: yarns.weightCategory,
+      skeins: yarns.skeins,
+      storageLocationId: yarns.storageLocationId,
+    })
+    .from(yarns)
+    .where(eq(yarns.userId, userId));
+
+  const byLocation = new Map<string, LocationWithYarns["yarns"]>();
+  for (const y of yarnRows) {
+    if (!y.storageLocationId) continue;
+    const list = byLocation.get(y.storageLocationId) ?? [];
+    list.push({
+      brand: y.brand ?? "",
+      productLine: y.productLine ?? "",
+      colorway: y.colorway ?? "",
+      weight: y.weightCategory ?? "",
+      skeins: y.skeins ?? 1,
+    });
+    byLocation.set(y.storageLocationId, list);
+  }
+
+  return locs.map((loc) => ({
+    ...loc,
+    yarns: byLocation.get(loc.id) ?? [],
+  }));
+}
+
 export async function getStats() {
   const [ys, ps] = await Promise.all([getYarns(), getProjects()]);
   return {
