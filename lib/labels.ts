@@ -106,6 +106,8 @@ export async function generateLabelsPdf(boxes: BoxLabel[]): Promise<Buffer> {
     const bulletR = Math.max(0.8, colFont * 0.1);
     const indent = bulletR * 3 + 3;
 
+    const maxTextW = colWidth - indent - 4;
+
     items.forEach((yarn, i) => {
       const col = Math.floor(i / itemsPerCol);
       const row = i % itemsPerCol;
@@ -124,13 +126,19 @@ export async function generateLabelsPdf(boxes: BoxLabel[]): Promise<Buffer> {
       if (yarn.weight) text += ` (${yarn.weight})`;
       if (yarn.skeins > 1) text += ` x${yarn.skeins}`;
 
+      while (text.length > 1 && regular.widthOfTextAtSize(text, colFont) > maxTextW) {
+        text = text.slice(0, -1);
+      }
+      if (regular.widthOfTextAtSize(text, colFont) > maxTextW) {
+        text = text.slice(0, -1) + "…";
+      }
+
       page.drawText(text, {
         x: x + indent,
         y,
         size: colFont,
         font: regular,
         color: rgb(0.06, 0.09, 0.15),
-        maxWidth: colWidth - indent - 4,
       });
     });
   }
