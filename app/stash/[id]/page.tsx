@@ -6,7 +6,7 @@ import {
   getProjectsUsingYarn,
   getYarn,
 } from "@/lib/data";
-import { YarnEditor } from "@/components/YarnEditor";
+import { YarnDetails } from "@/components/YarnDetails";
 import { PatternCard } from "@/components/PatternCard";
 
 export const dynamic = "force-dynamic";
@@ -62,45 +62,7 @@ export default async function YarnDetailPage({
           </div>
         </div>
 
-        <div className="flex flex-col justify-center">
-          <p className="text-xs uppercase tracking-[0.18em] text-muted">
-            {yarn.brand} · {yarn.productLine}
-          </p>
-          <h1 className="mt-1 font-display text-4xl tracking-tight md:text-5xl">
-            {yarn.colorway}
-          </h1>
-          <p className="mt-2 text-muted">{yarn.fiber}</p>
-
-          <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Spec label="Skeins" value={`×${yarn.skeins}`} />
-            <Spec
-              label="Per skein"
-              value={`${yarn.yardage} yds${yarn.meters ? ` · ${yarn.meters}m` : ""}`}
-            />
-            <Spec label="Total" value={`${total.toLocaleString()} yds`} />
-            <Spec
-              label="Skein weight"
-              value={yarn.skeinGrams ? `${yarn.skeinGrams} g` : "—"}
-            />
-            <Spec label="Dye lot" value={yarn.dyeLot || "—"} />
-            <Spec label="Storage" value={yarn.locationName || yarn.storage || "—"} />
-          </dl>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/projects/new" className="btn-grad">
-              Use in project
-            </Link>
-            <Link href="/stash" className="btn-ghost">
-              ← Back to stash
-            </Link>
-          </div>
-
-          {yarn.notes && (
-            <p className="mt-6 max-w-prose whitespace-pre-wrap rounded-xl border border-border bg-white/70 px-4 py-3 text-sm text-ink">
-              {yarn.notes}
-            </p>
-          )}
-        </div>
+        <YarnDetails yarn={yarn} locations={locations} />
       </div>
 
       <section>
@@ -174,17 +136,6 @@ export default async function YarnDetailPage({
           </ul>
         </section>
       )}
-
-      <YarnEditor yarn={yarn} locations={locations} />
-    </div>
-  );
-}
-
-function Spec({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-white/70 px-3 py-2">
-      <dt className="text-[11px] uppercase tracking-wider text-muted">{label}</dt>
-      <dd className="mt-0.5 truncate font-display text-base">{value}</dd>
     </div>
   );
 }
