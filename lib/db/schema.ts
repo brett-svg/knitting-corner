@@ -175,6 +175,16 @@ export const tags = pgTable(
   (t) => [unique().on(t.userId, t.name)]
 );
 
+// ── Ravelry response cache ────────────────────────────────────────────────
+// Shared across users (it only holds public Ravelry data). Rows older than
+// the TTL in lib/ravelry-cache.ts are treated as misses and pruned on write.
+
+export const ravelryCache = pgTable("ravelry_cache", {
+  key: text("key").primaryKey(),
+  payload: jsonb("payload").notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ── Inventory sessions ────────────────────────────────────────────────────
 // A counting session: capture on the phone, review + commit on the laptop.
 // Nothing touches `yarns` until commit.

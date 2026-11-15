@@ -26,6 +26,7 @@ export type Yarn = {
   locationName?: string | null;
   reserved?: boolean;
   notes?: string | null;
+  ravelryYarnId?: number | null; // set when the yarn was matched to Ravelry's database
   addedAt: string;
 };
 
@@ -54,6 +55,7 @@ export const yarns: Yarn[] = [
     meters: 192,
     skeinGrams: 100,
     skeins: 4,
+    ravelryYarnId: 62569,
     storage: "Bin A · Top shelf",
     locationId: "loc1",
     locationName: "Bin A · Top shelf",
@@ -73,6 +75,7 @@ export const yarns: Yarn[] = [
     meters: 128,
     skeinGrams: 50,
     skeins: 6,
+    ravelryYarnId: 68219,
     storage: "Bin B",
     locationId: "loc2",
     locationName: "Bin B",

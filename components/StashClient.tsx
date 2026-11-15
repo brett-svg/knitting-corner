@@ -96,8 +96,11 @@ export function StashClient({ yarns }: { yarns: Yarn[] }) {
             {filtered.length} of {yarns.length} skeins shown
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <ViewToggle view={view} setView={setView} />
+          <Link href="/stash/make" className="btn-ghost">
+            What can I make?
+          </Link>
           <Link href="/stash/sessions" className="btn-ghost">
             Count a batch
           </Link>

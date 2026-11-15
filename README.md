@@ -10,7 +10,7 @@ A private craft command center — yarn stash, patterns, projects, and AI label 
 - Email + password auth, signed httpOnly session cookie (no third-party auth service)
 - Railway Buckets (S3-compatible) for yarn photos, pattern PDFs and covers
 - Anthropic Claude (`claude-haiku-4-5` by default) for yarn-label extraction
-- Ravelry API for canonical yarn data
+- Ravelry API for canonical yarn data and pattern suggestions
 
 ## Setup
 
@@ -33,7 +33,7 @@ Open http://localhost:3000. With no `DATABASE_URL` the app runs in demo mode wit
 | `S3_BUCKET` / `S3_ENDPOINT` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_REGION` | object storage; uploads are disabled if unset |
 | `ANTHROPIC_API_KEY` | enables real label scanning (mocked if absent) |
 | `ANTHROPIC_MODEL` | optional override (default `claude-haiku-4-5`) |
-| `RAVELRY_USERNAME` / `RAVELRY_PASSWORD` | optional; read-only Ravelry API key. When set, scanned labels are matched against Ravelry's yarn database and fiber/yardage/weight are filled from the canonical listing |
+| `RAVELRY_USERNAME` / `RAVELRY_PASSWORD` | optional; read-only Ravelry API key. When set, scanned labels are matched against Ravelry's yarn database (fiber/yardage/weight come from the canonical listing), and "What can I make?" on the yarn page and `/stash/make` suggests Ravelry patterns. Without it the "From Ravelry" rows are hidden. Responses are cached for 24 h in the `ravelry_cache` table |
 
 ### Railway
 
@@ -57,6 +57,15 @@ One project, three services:
 
 Once it's up, open `/login`, create your account, and check `/whoami` to confirm every service shows as connected.
 
+### Tests
+
+```bash
+npm test                  # vitest: weight mapping, suggestion building, Ravelry parsing
+```
+
+Tests and demo mode run on saved Ravelry responses in `lib/__fixtures__/`. Refresh them with
+`RAVELRY_USERNAME=… RAVELRY_PASSWORD=… npm run ravelry:fixtures`.
+
 ### Schema changes
 
 Edit `lib/db/schema.ts`, run `npm run db:generate` to write a migration into `drizzle/`, commit it. It applies on the next deploy (or `npm run db:migrate` locally).
@@ -72,6 +81,7 @@ Edit `lib/db/schema.ts`, run `npm run db:generate` to write a migration into `dr
 - ✅ AI label scanning endpoint (real or mocked) + camera flow
 - ✅ Ravelry canonicalization: scanned brand/line is matched to Ravelry's yarn DB; fiber, yardage, grams and weight come from the listing (AI tiebreak when several candidates fit; manual pick otherwise)
 - ✅ Storage locations CRUD (Tools → Locations) wired into the yarn editor and detail page
-- ✅ "What can I make?" — yarn detail page surfaces compatible patterns
+- ✅ "What can I make?" — yarn detail page surfaces compatible patterns from your library, plus Ravelry patterns made with that exact yarn and popular same-weight patterns that fit the yardage on hand (Free only toggle, "Save to my patterns")
+- ✅ Whole-stash "What can I make?" (`/stash/make`, from the Stash header): stash grouped by weight with total yards; tick yarns to combine their yardage; knitting/crochet and item-type filters
 - ✅ Mobile pass: tighter 5-tab bottom nav, iOS safe-area, focus rings, scrollable filter rows
 - ✅ Counting sessions (Stash → "Count a batch"): snap every skein on the phone with no typing — photos upload and are read in the background; "Same as last +1" for repeats; "+ back of band" re-reads with both photos. Review the batch on any screen as a live-updating table (inline edits, Enter to accept, Ravelry tags, merge-into-existing suggestions), then commit everything to the stash in one transaction.

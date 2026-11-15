@@ -8,6 +8,9 @@ import {
 } from "@/lib/data";
 import { YarnDetails } from "@/components/YarnDetails";
 import { PatternCard } from "@/components/PatternCard";
+import { RavelrySuggestions } from "@/components/RavelrySuggestions";
+import { ravelrySuggestionsEnabled } from "@/lib/pattern-suggestions";
+import { libraryMatches } from "@/lib/suggestions";
 
 export const dynamic = "force-dynamic";
 
@@ -27,13 +30,7 @@ export default async function YarnDetailPage({
 
   // "What can I make?" — patterns this yarn could become
   const total = yarn.yardage * yarn.skeins;
-  const possible = patterns
-    .filter((p) => {
-      if (p.yarnWeight && p.yarnWeight !== yarn.weight) return false;
-      if (p.requiredYardage && total < p.requiredYardage) return false;
-      return true;
-    })
-    .sort((a, b) => (b.requiredYardage ?? 0) - (a.requiredYardage ?? 0));
+  const possible = libraryMatches(patterns, yarn.weight, total);
 
   return (
     <div className="space-y-10">
@@ -82,8 +79,11 @@ export default async function YarnDetailPage({
             </>
           )}
         </h2>
+        <h3 className="mt-5 text-xs font-medium uppercase tracking-[0.18em] text-muted">
+          From your library
+        </h3>
         {possible.length > 0 ? (
-          <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+          <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
             {possible.slice(0, 8).map((p) => (
               <PatternCard key={p.id} pattern={p} />
             ))}
@@ -99,6 +99,13 @@ export default async function YarnDetailPage({
               Add a pattern
             </Link>
           </div>
+        )}
+
+        {ravelrySuggestionsEnabled() && (
+          <RavelrySuggestions
+            endpoint={`/api/yarns/${yarn.id}/suggestions`}
+            fallbackWeight={yarn.weight}
+          />
         )}
       </section>
 

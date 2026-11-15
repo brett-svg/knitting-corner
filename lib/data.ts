@@ -59,6 +59,7 @@ function rowToYarn(r: YarnRow, locationName: string | null = null): Yarn {
     locationName,
     reserved: r.reserved ?? false,
     notes: r.notes,
+    ravelryYarnId: r.ravelryYarnId,
     addedAt: day(r.createdAt),
   };
 }
