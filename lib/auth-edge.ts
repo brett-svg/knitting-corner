@@ -4,7 +4,9 @@ import { jwtVerify, SignJWT } from "jose";
 
 export const COOKIE_NAME = "kc_session";
 
-export type SessionUser = { id: string; email: string };
+// mustChangePassword rides in the token so middleware can gate on it
+// without a DB hit. Tokens issued before it existed read as false.
+export type SessionUser = { id: string; email: string; mustChangePassword?: boolean };
 
 function secret(): Uint8Array {
   const s = process.env.AUTH_SECRET;
@@ -13,7 +15,7 @@ function secret(): Uint8Array {
 }
 
 export async function signSession(user: SessionUser, days: number): Promise<string> {
-  return new SignJWT({ email: user.email })
+  return new SignJWT({ email: user.email, ...(user.mustChangePassword ? { mcp: true } : {}) })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
     .setIssuedAt()
@@ -25,7 +27,7 @@ export async function verifySession(token: string): Promise<SessionUser | null> 
   try {
     const { payload } = await jwtVerify(token, secret());
     if (!payload.sub || typeof payload.email !== "string") return null;
-    return { id: payload.sub, email: payload.email };
+    return { id: payload.sub, email: payload.email, mustChangePassword: payload.mcp === true };
   } catch {
     return null;
   }

@@ -81,5 +81,23 @@ export async function signIn(email: string, password: string): Promise<SessionUs
   // Same error either way so the form doesn't leak which emails exist.
   if (!row || !(await verifyPassword(password, row.passwordHash)))
     throw new Error("Email or password is incorrect.");
-  return { id: row.id, email: row.email };
+  return { id: row.id, email: row.email, mustChangePassword: row.mustChangePassword };
+}
+
+export async function changePassword(
+  user: SessionUser,
+  currentPassword: string,
+  newPassword: string
+): Promise<SessionUser> {
+  if (newPassword.length < 8) throw new Error("New password must be at least 8 characters.");
+  if (newPassword === currentPassword)
+    throw new Error("New password must be different from the current one.");
+  const row = await db().query.users.findFirst({ where: eq(schema.users.id, user.id) });
+  if (!row || !(await verifyPassword(currentPassword, row.passwordHash)))
+    throw new Error("Current password is incorrect.");
+  await db()
+    .update(schema.users)
+    .set({ passwordHash: await hashPassword(newPassword), mustChangePassword: false })
+    .where(eq(schema.users.id, user.id));
+  return { id: row.id, email: row.email, mustChangePassword: false };
 }

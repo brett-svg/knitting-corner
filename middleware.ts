@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE_NAME, verifySession } from "@/lib/auth-edge";
 
 const PUBLIC_PATHS = [/^\/login/, /^\/api\/auth\//];
+const CHANGE_PASSWORD_PATHS = [/^\/change-password$/, /^\/api\/auth\//, /^\/auth\/signout$/];
 
 export async function middleware(request: NextRequest) {
   // No database configured? Run in demo mode — let everything through.
@@ -20,6 +21,13 @@ export async function middleware(request: NextRequest) {
     const redirect = new URL("/login", request.url);
     redirect.searchParams.set("next", path);
     return NextResponse.redirect(redirect);
+  }
+  // Temporary password: nothing but the change form (and sign-out) until it's replaced.
+  if (user?.mustChangePassword && !CHANGE_PASSWORD_PATHS.some((re) => re.test(path))) {
+    if (path.startsWith("/api/")) {
+      return NextResponse.json({ error: "Password change required" }, { status: 403 });
+    }
+    return NextResponse.redirect(new URL("/change-password", request.url));
   }
   if (user && path === "/login") {
     return NextResponse.redirect(new URL("/", request.url));

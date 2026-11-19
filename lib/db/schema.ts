@@ -27,6 +27,8 @@ export const users = pgTable("users", {
   id: id(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  // Set for accounts created with a temporary password; cleared on change.
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
   createdAt: createdAt(),
 });
 
