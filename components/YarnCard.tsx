@@ -2,14 +2,48 @@ import Link from "next/link";
 import type { Yarn } from "@/lib/mock";
 import clsx from "clsx";
 
-export function YarnCard({ yarn }: { yarn: Yarn }) {
+export function YarnCard({
+  yarn,
+  selectable = false,
+  selected = false,
+  onToggle,
+}: {
+  yarn: Yarn;
+  // In select mode the card toggles selection instead of opening the yarn.
+  selectable?: boolean;
+  selected?: boolean;
+  onToggle?: () => void;
+}) {
+  const className = clsx(
+    "group card block w-full overflow-hidden text-left transition hover:-translate-y-0.5 hover:shadow-glow",
+    selected && "ring-2 ring-accent-lavender shadow-glow"
+  );
+  const body = <YarnCardBody yarn={yarn} selectable={selectable} selected={selected} />;
+  if (selectable) {
+    return (
+      <button type="button" onClick={onToggle} aria-pressed={selected} className={className}>
+        {body}
+      </button>
+    );
+  }
   return (
-    <Link
-      href={`/stash/${yarn.id}`}
-      className={clsx(
-        "group card block overflow-hidden transition hover:-translate-y-0.5 hover:shadow-glow"
-      )}
-    >
+    <Link href={`/stash/${yarn.id}`} className={className}>
+      {body}
+    </Link>
+  );
+}
+
+function YarnCardBody({
+  yarn,
+  selectable,
+  selected,
+}: {
+  yarn: Yarn;
+  selectable: boolean;
+  selected: boolean;
+}) {
+  return (
+    <>
       <div
         className="relative aspect-[5/4] w-full overflow-hidden"
         style={!yarn.imageUrl ? { background: yarn.swatch } : undefined}
@@ -64,6 +98,20 @@ export function YarnCard({ yarn }: { yarn: Yarn }) {
           )}
         </div>
 
+        {selectable && (
+          <span
+            aria-hidden
+            className={clsx(
+              "absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full border-2 text-xs font-bold shadow-soft transition",
+              selected
+                ? "border-white bg-grad-signature text-white"
+                : "border-white/90 bg-black/20 text-transparent"
+            )}
+          >
+            ✓
+          </span>
+        )}
+
         <div className="absolute bottom-3 right-3">
           <span className="rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-ink shadow-soft">
             ×{yarn.skeins}
@@ -84,7 +132,12 @@ export function YarnCard({ yarn }: { yarn: Yarn }) {
           {yarn.brand} · {yarn.productLine}
         </p>
         <p className="truncate text-xs text-muted/80">{yarn.fiber}</p>
+        {yarn.locationName && (
+          <p className="truncate pt-1 text-[11px] font-medium uppercase tracking-wider text-muted">
+            {yarn.locationName}
+          </p>
+        )}
       </div>
-    </Link>
+    </>
   );
 }

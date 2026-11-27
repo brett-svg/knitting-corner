@@ -61,6 +61,7 @@ function rowToYarn(r: YarnRow, locationName: string | null = null): Yarn {
     notes: r.notes,
     ravelryYarnId: r.ravelryYarnId,
     addedAt: day(r.createdAt),
+    addedAtIso: new Date(r.createdAt).toISOString(),
   };
 }
 

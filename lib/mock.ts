@@ -27,7 +27,8 @@ export type Yarn = {
   reserved?: boolean;
   notes?: string | null;
   ravelryYarnId?: number | null; // set when the yarn was matched to Ravelry's database
-  addedAt: string;
+  addedAt: string; // YYYY-MM-DD (UTC)
+  addedAtIso?: string; // full timestamp, for grouping by the viewer's local day
 };
 
 export type StorageLocation = {
