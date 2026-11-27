@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 export function SkeinStepper({
   value,
   onChange,
@@ -13,6 +15,11 @@ export function SkeinStepper({
   max?: number;
   label?: string;
 }) {
+  // Keep the raw text locally so the field can be cleared and retyped;
+  // only valid numbers are pushed up, and blur restores the last good value.
+  const [text, setText] = useState(String(value));
+  useEffect(() => setText(String(value)), [value]);
+
   const dec = () => onChange(Math.max(min, value - 1));
   const inc = () => onChange(Math.min(max, value + 1));
   return (
@@ -32,13 +39,19 @@ export function SkeinStepper({
         </button>
         <input
           type="number"
-          value={value}
+          inputMode="numeric"
+          value={text}
           min={min}
           max={max}
+          onFocus={(e) => e.target.select()}
           onChange={(e) => {
-            const n = Number(e.target.value);
-            if (Number.isFinite(n)) onChange(Math.max(min, Math.min(max, n)));
+            setText(e.target.value);
+            const n = Math.round(Number(e.target.value));
+            if (e.target.value !== "" && Number.isFinite(n) && n >= min) {
+              onChange(Math.min(max, n));
+            }
           }}
+          onBlur={() => setText(String(value))}
           className="h-11 w-16 rounded-xl border border-border bg-white text-center text-lg font-display text-ink outline-none transition focus:border-accent-lavender focus:shadow-[0_0_0_4px_rgba(192,132,252,0.15)]"
         />
         <button

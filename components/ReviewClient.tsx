@@ -284,6 +284,8 @@ function Row({
 }) {
   const [draft, setDraft] = useState<YarnLabel | null>(item.label);
   const [skeins, setSkeins] = useState(item.skeins);
+  // Raw text for the skeins box so it can be cleared and retyped.
+  const [skeinsText, setSkeinsText] = useState(String(item.skeins));
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [overrides, setOverrides] = useState<string[]>(item.ravelry?.overrides ?? []);
@@ -293,6 +295,7 @@ function Row({
     if (dirty.current) return;
     setDraft(item.label);
     setSkeins(item.skeins);
+    setSkeinsText(String(item.skeins));
     setOverrides(item.ravelry?.overrides ?? []);
   }, [item.label, item.skeins, item.ravelry, item.updatedAt]);
 
@@ -312,8 +315,10 @@ function Row({
     queueSave({ label: next });
   }
 
-  function editSkeins(n: number) {
-    const v = Math.max(1, Math.round(n) || 1);
+  function editSkeins(raw: string) {
+    setSkeinsText(raw);
+    const v = Math.round(Number(raw));
+    if (raw === "" || !Number.isFinite(v) || v < 1) return;
     setSkeins(v);
     queueSave({ skeins: v });
   }
@@ -413,8 +418,11 @@ function Row({
             <input
               type="number"
               min={1}
-              value={skeins}
-              onChange={(e) => editSkeins(Number(e.target.value))}
+              inputMode="numeric"
+              value={skeinsText}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => editSkeins(e.target.value)}
+              onBlur={() => setSkeinsText(String(skeins))}
               disabled={!editable}
               className={clsx(inputCls, "font-medium")}
             />
